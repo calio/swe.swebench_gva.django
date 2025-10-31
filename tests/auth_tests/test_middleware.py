@@ -1,8 +1,9 @@
+from django.contrib.auth import get_user
 from django.contrib.auth.middleware import AuthenticationMiddleware
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest, HttpResponse
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 
 class TestAuthenticationMiddleware(TestCase):
@@ -50,3 +51,29 @@ class TestAuthenticationMiddleware(TestCase):
         self.assertEqual(auser, self.user)
         auser_second = await self.request.auser()
         self.assertIs(auser, auser_second)
+
+    @override_settings(
+        SECRET_KEY="new-secret-key",
+        SECRET_KEY_FALLBACKS=["old-secret-key"],
+    )
+    def test_session_valid_with_fallback_key(self):
+        """
+        Test that sessions remain valid after SECRET_KEY rotation when the old
+        key is in SECRET_KEY_FALLBACKS.
+        """
+        # First, create a session with the old key
+        with override_settings(
+            SECRET_KEY="old-secret-key",
+            SECRET_KEY_FALLBACKS=[],
+        ):
+            self.client.force_login(self.user)
+            # Get the session data
+            old_session_key = self.client.session.session_key
+            old_session_data = dict(self.client.session)
+
+        # Now simulate a SECRET_KEY rotation
+        # The session should still be valid with the fallback key
+        self.request.session = old_session_data
+        user = get_user(self.request)
+        self.assertEqual(user, self.user)
+        self.assertFalse(user.is_anonymous)

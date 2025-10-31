@@ -199,14 +199,42 @@ def get_user(request):
             # Verify the session
             if hasattr(user, "get_session_auth_hash"):
                 session_hash = request.session.get(HASH_SESSION_KEY)
-                session_hash_verified = session_hash and constant_time_compare(
-                    session_hash, user.get_session_auth_hash()
-                )
+                session_hash_verified = _verify_session_auth_hash(session_hash, user)
                 if not session_hash_verified:
                     request.session.flush()
                     user = None
 
     return user or AnonymousUser()
+
+
+def _verify_session_auth_hash(session_hash, user):
+    """
+    Verify the session auth hash against the user's current and fallback hashes.
+    Returns True if the hash matches any valid key.
+    """
+    if not session_hash or not hasattr(user, "get_session_auth_hash"):
+        return False
+    
+    # Import here to avoid circular imports
+    from django.utils.crypto import salted_hmac
+    
+    # Try the current SECRET_KEY
+    if constant_time_compare(session_hash, user.get_session_auth_hash()):
+        return True
+    
+    # Try fallback keys
+    key_salt = "django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash"
+    for fallback_key in settings.SECRET_KEY_FALLBACKS:
+        fallback_hash = salted_hmac(
+            key_salt,
+            user.password,
+            secret=fallback_key,
+            algorithm="sha256",
+        ).hexdigest()
+        if constant_time_compare(session_hash, fallback_hash):
+            return True
+    
+    return False
 
 
 def get_permission_codename(action, opts):
