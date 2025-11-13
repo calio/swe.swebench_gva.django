@@ -234,9 +234,10 @@ class UserCreationFormTest(TestDataMixin, TestCase):
     ])
     def test_password_help_text(self):
         form = UserCreationForm()
+        # The help text contains a Unicode right single quotation mark (U+2019)
         self.assertEqual(
-            form.fields['password1'].help_text,
-            '<ul><li>Your password can&#39;t be too similar to your other personal information.</li></ul>'
+            str(form.fields['password1'].help_text),
+            "<ul><li>Your password can\u2019t be too similar to your other personal information.</li></ul>"
         )
 
     @override_settings(AUTH_PASSWORD_VALIDATORS=[
