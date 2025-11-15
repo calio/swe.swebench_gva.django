@@ -126,16 +126,25 @@ class JSONField(CheckFieldDefaultMixin, Field):
         )
 
 
-def compile_json_path(key_transforms, include_root=True):
+def compile_json_path(key_transforms, include_root=True, try_parse_int=True):
     path = ["$"] if include_root else []
     for key_transform in key_transforms:
-        try:
-            num = int(key_transform)
-        except ValueError:  # non-integer
+        if isinstance(key_transform, int):
+            # Actual integer - treat as array index
+            path.append("[%s]" % key_transform)
+        elif try_parse_int:
+            # Try to parse as integer for array access
+            try:
+                num = int(key_transform)
+                path.append("[%s]" % num)
+            except (ValueError, TypeError):
+                # Not an integer - treat as object key
+                path.append(".")
+                path.append(json.dumps(key_transform))
+        else:
+            # String key - treat as object key (even if it looks like a number)
             path.append(".")
             path.append(json.dumps(key_transform))
-        else:
-            path.append("[%s]" % num)
     return "".join(path)
 
 
@@ -191,13 +200,19 @@ class HasKeyLookup(PostgresOperatorLookup):
         for key in rhs:
             if isinstance(key, KeyTransform):
                 *_, rhs_key_transforms = key.preprocess_lhs(compiler, connection)
+                # KeyTransform paths should try to parse integers for array access
+                try_parse_int = True
             else:
                 rhs_key_transforms = [key]
+                # Plain values should not parse integers (treat numeric strings as keys)
+                try_parse_int = False
             rhs_params.append(
                 "%s%s"
                 % (
                     lhs_json_path,
-                    compile_json_path(rhs_key_transforms, include_root=False),
+                    compile_json_path(
+                        rhs_key_transforms, include_root=False, try_parse_int=try_parse_int
+                    ),
                 )
             )
         # Add condition for each key.
@@ -244,7 +259,7 @@ class HasKeys(HasKeyLookup):
     logical_operator = " AND "
 
     def get_prep_lookup(self):
-        return [str(item) for item in self.rhs]
+        return list(self.rhs)
 
 
 class HasAnyKeys(HasKeys):
@@ -307,18 +322,23 @@ class KeyTransform(Transform):
 
     def __init__(self, key_name, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.original_key_name = key_name
         self.key_name = str(key_name)
 
     def preprocess_lhs(self, compiler, connection):
-        key_transforms = [self.key_name]
+        # Use original_key_name to preserve type (int vs str)
+        key_transforms = [self.original_key_name]
         previous = self.lhs
         while isinstance(previous, KeyTransform):
-            key_transforms.insert(0, previous.key_name)
+            key_transforms.insert(0, previous.original_key_name)
             previous = previous.lhs
         lhs, params = compiler.compile(previous)
         if connection.vendor == "oracle":
             # Escape string-formatting.
-            key_transforms = [key.replace("%", "%%") for key in key_transforms]
+            key_transforms = [
+                str(key).replace("%", "%%") if isinstance(key, str) else key
+                for key in key_transforms
+            ]
         return lhs, params, key_transforms
 
     def as_mysql(self, compiler, connection):
@@ -398,14 +418,15 @@ class KeyTransformIsNull(lookups.IsNull):
         return "(NOT %s OR %s IS NULL)" % (sql, lhs), tuple(params) + tuple(lhs_params)
 
     def as_sqlite(self, compiler, connection):
+        # For nested KeyTransforms, we need to use the full path
+        lhs, lhs_params, lhs_key_transforms = self.lhs.preprocess_lhs(
+            compiler, connection
+        )
+        json_path = compile_json_path(lhs_key_transforms)
         template = "JSON_TYPE(%s, %%s) IS NULL"
         if not self.rhs:
             template = "JSON_TYPE(%s, %%s) IS NOT NULL"
-        return HasKey(self.lhs.lhs, self.lhs.key_name).as_sql(
-            compiler,
-            connection,
-            template=template,
-        )
+        return template % lhs, tuple(lhs_params) + (json_path,)
 
 
 class KeyTransformIn(lookups.In):
@@ -566,4 +587,9 @@ class KeyTransformFactory:
         self.key_name = key_name
 
     def __call__(self, *args, **kwargs):
-        return KeyTransform(self.key_name, *args, **kwargs)
+        # Try to parse key_name as an integer for array access
+        try:
+            key_name = int(self.key_name)
+        except (ValueError, TypeError):
+            key_name = self.key_name
+        return KeyTransform(key_name, *args, **kwargs)
