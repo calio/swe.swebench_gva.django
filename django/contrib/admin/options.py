@@ -1043,6 +1043,9 @@ class ModelAdmin(BaseModelAdmin):
                 lookup_spawns_duplicates(self.opts, search_spec)
                 for search_spec in orm_lookups
             )
+            # Use distinct() to remove duplicates from M2M relationships
+            if may_have_duplicates:
+                queryset = queryset.distinct()
         return queryset, may_have_duplicates
 
     def get_preserved_filters(self, request):
