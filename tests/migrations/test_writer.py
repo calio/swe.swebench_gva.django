@@ -787,6 +787,31 @@ class WriterTests(SimpleTestCase):
         output = writer.as_string()
         self.assertIn("from django.db import migrations\n", output)
 
+    def test_models_import_included_for_bases(self):
+        """
+        django.db.models should be imported when models.Model is used as a base.
+        Regression test for #32889 - Missing import statement in generated migration
+        when a model has multiple inheritance (mixin + abstract base).
+        """
+        migration = type("Migration", (migrations.Migration,), {
+            "operations": [
+                migrations.CreateModel(
+                    name='MyModel',
+                    fields=[
+                        ('id', models.AutoField(primary_key=True)),
+                    ],
+                    bases=(models.Model,),
+                ),
+            ]
+        })
+        writer = MigrationWriter(migration)
+        output = writer.as_string()
+        # Verify that the models import is present
+        self.assertIn("from django.db import migrations, models\n", output)
+        # Verify that the migration can be executed without NameError
+        result = self.safe_exec(output)
+        self.assertIn('Migration', result)
+
     def test_deconstruct_class_arguments(self):
         # Yes, it doesn't make sense to use a class as a default for a
         # CharField. It does make sense for custom fields though, for example
