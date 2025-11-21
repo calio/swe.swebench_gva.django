@@ -103,8 +103,9 @@ class MiddlewareMixin:
         a thread is not consumed during a whole request.
         """
         if asyncio.iscoroutinefunction(self.get_response):
-            # Mark the class as async-capable, but do the actual switch
-            # inside __call__ to avoid swapping out dunder methods
+            # Mark the instance as a coroutine so that asyncio knows to await it.
+            # This is necessary because __call__ will return a coroutine when
+            # get_response is async.
             self._is_coroutine = asyncio.coroutines._is_coroutine
 
     def __call__(self, request):
