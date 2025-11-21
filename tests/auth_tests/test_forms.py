@@ -931,6 +931,20 @@ class UserChangeFormTest(TestDataMixin, TestCase):
             form.fields["username"].widget.attrs.get("autocapitalize"), "none"
         )
 
+    def test_password_help_text_with_user_pk(self):
+        """
+        Test that the password field help_text contains a link to the password
+        change form using the user's pk, not a hardcoded relative path.
+        This ensures the link works correctly when UserAdmin is accessed via
+        a non-standard primary key (e.g., via to_field parameter).
+        """
+        user = User.objects.get(username="testclient")
+        form = UserChangeForm(instance=user)
+        password_field = form.fields.get("password")
+        self.assertIsNotNone(password_field)
+        # The help_text should contain a link with the user's pk
+        self.assertIn(f"../../{user.pk}/password/", password_field.help_text)
+
 
 @override_settings(TEMPLATES=AUTH_TEMPLATES)
 class PasswordResetFormTest(TestDataMixin, TestCase):
