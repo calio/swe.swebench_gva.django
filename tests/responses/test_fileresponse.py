@@ -255,6 +255,8 @@ class FileResponseTests(SimpleTestCase):
             (".tar.gz", "application/gzip"),
             (".tar.bz2", "application/x-bzip"),
             (".tar.xz", "application/x-xz"),
+            (".tar.br", "application/x-br"),
+            (".tar.Z", "application/x-compress"),
         )
         for extension, mimetype in test_tuples:
             with self.subTest(ext=extension):
