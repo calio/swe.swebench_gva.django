@@ -255,6 +255,11 @@ class TestUtilsHtml(SimpleTestCase):
                 'Search for <a href="http://google.com/?q=">google.com/?q=</a>!'
             ),
             ('foo@example.com', '<a href="mailto:foo@example.com">foo@example.com</a>'),
+            # Test for issue with HTML escaped strings and trailing punctuation
+            (
+                'Search for google.com/?q=1&lt! and see.',
+                'Search for <a href="http://google.com/?q=1%3C">google.com/?q=1&lt</a>! and see.'
+            ),
         )
         for value, output in tests:
             with self.subTest(value=value):

@@ -283,9 +283,15 @@ def urlize(text, trim_url_limit=None, nofollow=False, autoescape=False):
             middle_unescaped = html.unescape(middle)
             stripped = middle_unescaped.rstrip(TRAILING_PUNCTUATION_CHARS)
             if middle_unescaped != stripped:
-                trail = middle[len(stripped):] + trail
-                middle = middle[:len(stripped) - len(middle_unescaped)]
-                trimmed_something = True
+                # Find the position in the escaped string that corresponds to the
+                # end of the stripped unescaped string by iterating through the
+                # escaped string and checking when the unescaped version matches.
+                for i in range(len(middle), -1, -1):
+                    if html.unescape(middle[:i]) == stripped:
+                        trail = middle[i:] + trail
+                        middle = middle[:i]
+                        trimmed_something = True
+                        break
         return lead, middle, trail
 
     def is_email_simple(value):
