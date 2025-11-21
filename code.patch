@@ -1,0 +1,72 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 4038859cfa..d8caed5230 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1302,6 +1302,16 @@ class Model(metaclass=ModelBase):
+             not settings.is_overridden('DEFAULT_AUTO_FIELD') and
+             not cls._meta.app_config._is_default_auto_field_overridden
+         ):
++            # Check if the primary key is a parent link field (inherited from parent model)
++            # Parent link fields are OneToOneFields with parent_link=True
++            if (
++                hasattr(cls._meta.pk, 'remote_field') and
++                cls._meta.pk.remote_field is not None and
++                getattr(cls._meta.pk.remote_field, 'parent_link', False)
++            ):
++                # This is an inherited primary key, not an auto-created one
++                return []
++            
+             return [
+                 checks.Warning(
+                     f"Auto-created primary key used when not defining a "
+diff --git a/tests/check_framework/test_model_checks.py b/tests/check_framework/test_model_checks.py
+index d4342ada07..fb498d3470 100644
+--- a/tests/check_framework/test_model_checks.py
++++ b/tests/check_framework/test_model_checks.py
+@@ -415,3 +415,46 @@ class ModelDefaultAutoFieldTests(SimpleTestCase):
+                 app_label = 'check_framework.apps.CheckPKConfig'
+ 
+         self.assertEqual(checks.run_checks(app_configs=apps.get_app_configs()), [])
++
++    def test_inherited_pk(self):
++        class Parent(models.Model):
++            id = models.BigAutoField(primary_key=True)
++
++            class Meta:
++                abstract = True
++
++        class Child(Parent):
++            pass
++
++        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])
++
++    def test_inherited_pk_non_abstract(self):
++        class Parent(models.Model):
++            id = models.BigAutoField(primary_key=True)
++
++        class Child(Parent):
++            pass
++
++        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])
++
++    def test_inherited_pk_multi_level(self):
++        class GrandParent(models.Model):
++            id = models.BigAutoField(primary_key=True)
++
++        class Parent(GrandParent):
++            pass
++
++        class Child(Parent):
++            pass
++
++        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])
++
++    def test_inherited_pk_proxy_model(self):
++        class Parent(models.Model):
++            id = models.BigAutoField(primary_key=True)
++
++        class ProxyChild(Parent):
++            class Meta:
++                proxy = True
++
++        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])

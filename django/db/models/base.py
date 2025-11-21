@@ -1302,6 +1302,16 @@ class Model(metaclass=ModelBase):
             not settings.is_overridden('DEFAULT_AUTO_FIELD') and
             not cls._meta.app_config._is_default_auto_field_overridden
         ):
+            # Check if the primary key is a parent link field (inherited from parent model)
+            # Parent link fields are OneToOneFields with parent_link=True
+            if (
+                hasattr(cls._meta.pk, 'remote_field') and
+                cls._meta.pk.remote_field is not None and
+                getattr(cls._meta.pk.remote_field, 'parent_link', False)
+            ):
+                # This is an inherited primary key, not an auto-created one
+                return []
+            
             return [
                 checks.Warning(
                     f"Auto-created primary key used when not defining a "

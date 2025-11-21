@@ -415,3 +415,46 @@ class ModelDefaultAutoFieldTests(SimpleTestCase):
                 app_label = 'check_framework.apps.CheckPKConfig'
 
         self.assertEqual(checks.run_checks(app_configs=apps.get_app_configs()), [])
+
+    def test_inherited_pk(self):
+        class Parent(models.Model):
+            id = models.BigAutoField(primary_key=True)
+
+            class Meta:
+                abstract = True
+
+        class Child(Parent):
+            pass
+
+        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])
+
+    def test_inherited_pk_non_abstract(self):
+        class Parent(models.Model):
+            id = models.BigAutoField(primary_key=True)
+
+        class Child(Parent):
+            pass
+
+        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])
+
+    def test_inherited_pk_multi_level(self):
+        class GrandParent(models.Model):
+            id = models.BigAutoField(primary_key=True)
+
+        class Parent(GrandParent):
+            pass
+
+        class Child(Parent):
+            pass
+
+        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])
+
+    def test_inherited_pk_proxy_model(self):
+        class Parent(models.Model):
+            id = models.BigAutoField(primary_key=True)
+
+        class ProxyChild(Parent):
+            class Meta:
+                proxy = True
+
+        self.assertEqual(checks.run_checks(app_configs=self.apps.get_app_configs()), [])
