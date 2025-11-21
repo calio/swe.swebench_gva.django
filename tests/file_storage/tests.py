@@ -1018,6 +1018,20 @@ class FieldCallableFileStorageTests(SimpleTestCase):
         storage = kwargs["storage"]
         self.assertIs(storage, callable_storage)
 
+    def test_deconstruction_callable_returns_default_storage(self):
+        """
+        Deconstructing a callable that returns default_storage should include
+        the callable in the deconstructed form, not omit it.
+        """
+        from .models import callable_storage_default
+
+        obj = Storage()
+        *_, kwargs = obj._meta.get_field("storage_callable_default").deconstruct()
+        # The storage kwarg should be present and should be the callable
+        self.assertIn("storage", kwargs)
+        storage = kwargs["storage"]
+        self.assertIs(storage, callable_storage_default)
+
 
 # Tests for a race condition on file saving (#4948).
 # This is written in such a way that it'll always pass on platforms
