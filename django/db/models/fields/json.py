@@ -479,6 +479,10 @@ class KeyTransformGte(KeyTransformNumericLookupMixin, lookups.GreaterThanOrEqual
     pass
 
 
+class KeyTransformIn(KeyTransformNumericLookupMixin, lookups.In):
+    pass
+
+
 KeyTransform.register_lookup(KeyTransformExact)
 KeyTransform.register_lookup(KeyTransformIExact)
 KeyTransform.register_lookup(KeyTransformIsNull)
@@ -494,6 +498,7 @@ KeyTransform.register_lookup(KeyTransformLt)
 KeyTransform.register_lookup(KeyTransformLte)
 KeyTransform.register_lookup(KeyTransformGt)
 KeyTransform.register_lookup(KeyTransformGte)
+KeyTransform.register_lookup(KeyTransformIn)
 
 
 class KeyTransformFactory:

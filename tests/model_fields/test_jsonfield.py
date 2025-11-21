@@ -653,6 +653,26 @@ class TestQuerying(TestCase):
     def test_key_iregex(self):
         self.assertIs(NullableJSONModel.objects.filter(value__foo__iregex=r'^bAr$').exists(), True)
 
+    def test_key_in(self):
+        # Test __in lookup on key transforms
+        # objs[3] has {'a': 'b', 'c': 14}
+        # objs[4] has {'a': 'b', 'c': 14, ...}
+        self.assertSequenceEqual(
+            NullableJSONModel.objects.filter(value__c__in=[14]).order_by('id'),
+            [self.objs[3], self.objs[4]],
+        )
+        # Test with multiple values in the list
+        self.assertSequenceEqual(
+            NullableJSONModel.objects.filter(value__c__in=[14, 2]).order_by('id'),
+            [self.objs[3], self.objs[4]],
+        )
+        # Test with string values
+        # objs[7] has {'foo': 'bar', ...}
+        self.assertSequenceEqual(
+            NullableJSONModel.objects.filter(value__foo__in=['bar']),
+            [self.objs[7]],
+        )
+
     @skipUnlessDBFeature('has_json_operators')
     def test_key_sql_injection(self):
         with CaptureQueriesContext(connection) as queries:
