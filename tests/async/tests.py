@@ -7,7 +7,7 @@ from asgiref.sync import async_to_sync
 from django.core.cache import DEFAULT_CACHE_ALIAS, caches
 from django.core.exceptions import ImproperlyConfigured, SynchronousOnlyOperation
 from django.http import HttpResponse
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 from django.utils.asyncio import async_unsafe
 from django.views.generic.base import View
 
@@ -125,3 +125,26 @@ class ViewTests(SimpleTestCase):
         sync.
         """
         self.assertIs(View.view_is_async, False)
+
+    def test_http_method_not_allowed_async_view(self):
+        """
+        Test that http_method_not_allowed returns a coroutine for async views.
+        This is a regression test for the issue where GET requests to an async
+        view with only POST handler would cause:
+        TypeError: object HttpResponseNotAllowed can't be used in 'await' expression
+        """
+        class AsyncPostOnlyView(View):
+            async def post(self, request, *args, **kwargs):
+                return HttpResponse("ok")
+
+        rf = RequestFactory()
+        view = AsyncPostOnlyView.as_view()
+        request = rf.get("/")
+
+        # The view should return a coroutine
+        result = view(request)
+        self.assertTrue(asyncio.iscoroutine(result))
+
+        # When awaited, it should return a 405 response
+        response = asyncio.run(result)
+        self.assertEqual(response.status_code, 405)
