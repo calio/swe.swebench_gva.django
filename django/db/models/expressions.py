@@ -442,6 +442,28 @@ class CombinedExpression(SQLiteNumericMixin, Expression):
     def set_source_expressions(self, exprs):
         self.lhs, self.rhs = exprs
 
+    def _resolve_output_field(self):
+        """
+        Override to handle temporal subtraction which should return DurationField.
+        """
+        # Check if this is a temporal subtraction (DateField/DateTimeField/TimeField - same type)
+        if self.connector == self.SUB:
+            try:
+                lhs_type = self.lhs.output_field.get_internal_type()
+            except FieldError:
+                lhs_type = None
+            try:
+                rhs_type = self.rhs.output_field.get_internal_type()
+            except FieldError:
+                rhs_type = None
+            
+            datetime_fields = {'DateField', 'DateTimeField', 'TimeField'}
+            if lhs_type in datetime_fields and lhs_type == rhs_type:
+                return fields.DurationField()
+        
+        # Fall back to the default behavior
+        return super()._resolve_output_field()
+
     def as_sql(self, compiler, connection):
         try:
             lhs_type = self.lhs.output_field.get_internal_type()
