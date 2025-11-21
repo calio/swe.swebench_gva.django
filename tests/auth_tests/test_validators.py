@@ -259,3 +259,13 @@ class UsernameValidatorsTests(SimpleTestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValidationError):
                     v(invalid)
+
+    def test_unicode_validator_rejects_trailing_newline(self):
+        v = validators.UnicodeUsernameValidator()
+        with self.assertRaises(ValidationError):
+            v('validuser\n')
+
+    def test_ascii_validator_rejects_trailing_newline(self):
+        v = validators.ASCIIUsernameValidator()
+        with self.assertRaises(ValidationError):
+            v('validuser\n')
