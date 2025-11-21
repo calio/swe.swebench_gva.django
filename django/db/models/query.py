@@ -1225,6 +1225,11 @@ class QuerySet:
         if self.query.extra_order_by or self.query.order_by:
             return True
         elif self.query.default_ordering and self.query.get_meta().ordering:
+            # If there's a GROUP BY clause, the SQL compiler will remove the
+            # ORDER BY clause when using Meta.ordering. In this case, the
+            # queryset is not ordered.
+            if self.query.group_by is not None:
+                return False
             return True
         else:
             return False

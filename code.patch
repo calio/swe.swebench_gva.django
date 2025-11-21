@@ -1,0 +1,49 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index 85cd8311a7..2bde8b9d60 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1225,6 +1225,11 @@ class QuerySet:
+         if self.query.extra_order_by or self.query.order_by:
+             return True
+         elif self.query.default_ordering and self.query.get_meta().ordering:
++            # If there's a GROUP BY clause, the SQL compiler will remove the
++            # ORDER BY clause when using Meta.ordering. In this case, the
++            # queryset is not ordered.
++            if self.query.group_by is not None:
++                return False
+             return True
+         else:
+             return False
+diff --git a/tests/queries/tests.py b/tests/queries/tests.py
+index f9a57b088a..ded90c8240 100644
+--- a/tests/queries/tests.py
++++ b/tests/queries/tests.py
+@@ -2084,6 +2084,28 @@ class QuerysetOrderedTests(unittest.TestCase):
+         self.assertIs(qs.ordered, False)
+         self.assertIs(qs.order_by('num_notes').ordered, True)
+ 
++    def test_annotated_ordering_with_default_ordering(self):
++        # Test for issue: QuerySet.ordered property is incorrect for GROUP BY
++        # queries on models with Meta.ordering.
++        # Tag has Meta.ordering = ['name']
++        qs = Tag.objects.annotate(num_children=Count('children'))
++        # When annotate() is used with a model that has default ordering,
++        # the SQL compiler removes the ORDER BY clause due to GROUP BY.
++        # Therefore, qs.ordered should be False.
++        self.assertIs(qs.ordered, False)
++
++    def test_annotated_ordering_with_default_ordering_and_explicit_order_by(self):
++        # When explicit order_by() is used with annotate(), the queryset
++        # should be ordered even if the model has default ordering.
++        qs = Tag.objects.annotate(num_children=Count('children')).order_by('name')
++        self.assertIs(qs.ordered, True)
++
++    def test_annotated_ordering_with_default_ordering_cleared(self):
++        # When default ordering is cleared with order_by(), the queryset
++        # should not be ordered.
++        qs = Tag.objects.annotate(num_children=Count('children')).order_by()
++        self.assertIs(qs.ordered, False)
++
+ 
+ @skipUnlessDBFeature('allow_sliced_subqueries_with_in')
+ class SubqueryTests(TestCase):

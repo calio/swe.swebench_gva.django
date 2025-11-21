@@ -2084,6 +2084,28 @@ class QuerysetOrderedTests(unittest.TestCase):
         self.assertIs(qs.ordered, False)
         self.assertIs(qs.order_by('num_notes').ordered, True)
 
+    def test_annotated_ordering_with_default_ordering(self):
+        # Test for issue: QuerySet.ordered property is incorrect for GROUP BY
+        # queries on models with Meta.ordering.
+        # Tag has Meta.ordering = ['name']
+        qs = Tag.objects.annotate(num_children=Count('children'))
+        # When annotate() is used with a model that has default ordering,
+        # the SQL compiler removes the ORDER BY clause due to GROUP BY.
+        # Therefore, qs.ordered should be False.
+        self.assertIs(qs.ordered, False)
+
+    def test_annotated_ordering_with_default_ordering_and_explicit_order_by(self):
+        # When explicit order_by() is used with annotate(), the queryset
+        # should be ordered even if the model has default ordering.
+        qs = Tag.objects.annotate(num_children=Count('children')).order_by('name')
+        self.assertIs(qs.ordered, True)
+
+    def test_annotated_ordering_with_default_ordering_cleared(self):
+        # When default ordering is cleared with order_by(), the queryset
+        # should not be ordered.
+        qs = Tag.objects.annotate(num_children=Count('children')).order_by()
+        self.assertIs(qs.ordered, False)
+
 
 @skipUnlessDBFeature('allow_sliced_subqueries_with_in')
 class SubqueryTests(TestCase):
