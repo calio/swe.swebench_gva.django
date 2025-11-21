@@ -1,0 +1,46 @@
+diff --git a/django/utils/translation/trans_real.py b/django/utils/translation/trans_real.py
+index 7dcc77b46c..ba344e5352 100644
+--- a/django/utils/translation/trans_real.py
++++ b/django/utils/translation/trans_real.py
+@@ -43,7 +43,10 @@ language_code_re = _lazy_re_compile(
+     re.IGNORECASE
+ )
+ 
+-language_code_prefix_re = _lazy_re_compile(r'^/(\w+([@-]\w+)?)(/|$)')
++language_code_prefix_re = _lazy_re_compile(
++    r'^/([a-z]{2,8}(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?)(/|$)',
++    re.IGNORECASE
++)
+ 
+ 
+ @receiver(setting_changed)
+diff --git a/tests/i18n/tests.py b/tests/i18n/tests.py
+index bb6ea15f85..5e1880e553 100644
+--- a/tests/i18n/tests.py
++++ b/tests/i18n/tests.py
+@@ -1610,6 +1610,25 @@ class MiscTests(SimpleTestCase):
+         self.assertEqual(g('/de-ch/'), 'de')
+         self.assertIsNone(g('/de-simple-page/'))
+ 
++    @override_settings(
++        LANGUAGES=[
++            ('en', 'English'),
++            ('en-latn-us', 'Latin English'),
++            ('en-Latn-US', 'BCP 47 case format'),
++            ('zh-hans-cn', 'Simplified Chinese'),
++        ],
++    )
++    def test_get_language_from_path_with_script_and_region(self):
++        """
++        Test that language codes with both script and region are recognized.
++        Regression test for #15098.
++        """
++        g = trans_real.get_language_from_path
++        self.assertEqual(g('/en-latn-us/'), 'en-latn-us')
++        self.assertEqual(g('/en-Latn-US/'), 'en-Latn-US')
++        self.assertEqual(g('/zh-hans-cn/'), 'zh-hans-cn')
++        self.assertIsNone(g('/en-simple-page/'))
++
+     def test_get_language_from_path_null(self):
+         g = trans_null.get_language_from_path
+         self.assertIsNone(g('/pl/'))

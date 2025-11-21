@@ -43,7 +43,10 @@ language_code_re = _lazy_re_compile(
     re.IGNORECASE
 )
 
-language_code_prefix_re = _lazy_re_compile(r'^/(\w+([@-]\w+)?)(/|$)')
+language_code_prefix_re = _lazy_re_compile(
+    r'^/([a-z]{2,8}(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?)(/|$)',
+    re.IGNORECASE
+)
 
 
 @receiver(setting_changed)

@@ -1610,6 +1610,25 @@ class MiscTests(SimpleTestCase):
         self.assertEqual(g('/de-ch/'), 'de')
         self.assertIsNone(g('/de-simple-page/'))
 
+    @override_settings(
+        LANGUAGES=[
+            ('en', 'English'),
+            ('en-latn-us', 'Latin English'),
+            ('en-Latn-US', 'BCP 47 case format'),
+            ('zh-hans-cn', 'Simplified Chinese'),
+        ],
+    )
+    def test_get_language_from_path_with_script_and_region(self):
+        """
+        Test that language codes with both script and region are recognized.
+        Regression test for #15098.
+        """
+        g = trans_real.get_language_from_path
+        self.assertEqual(g('/en-latn-us/'), 'en-latn-us')
+        self.assertEqual(g('/en-Latn-US/'), 'en-Latn-US')
+        self.assertEqual(g('/zh-hans-cn/'), 'zh-hans-cn')
+        self.assertIsNone(g('/en-simple-page/'))
+
     def test_get_language_from_path_null(self):
         g = trans_null.get_language_from_path
         self.assertIsNone(g('/pl/'))
