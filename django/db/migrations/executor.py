@@ -264,6 +264,7 @@ class MigrationExecutor:
     def check_replacements(self):
         """
         Mark replacement migrations applied if their replaced set all are.
+        Mark replacement migrations unapplied if their replaced set all are not.
 
         Do this unconditionally on every migrate, rather than just when
         migrations are applied or unapplied, to correctly handle the case
@@ -275,8 +276,11 @@ class MigrationExecutor:
         applied = self.recorder.applied_migrations()
         for key, migration in self.loader.replacements.items():
             all_applied = all(m in applied for m in migration.replaces)
+            none_applied = not any(m in applied for m in migration.replaces)
             if all_applied and key not in applied:
                 self.recorder.record_applied(*key)
+            elif none_applied and key in applied:
+                self.recorder.record_unapplied(*key)
 
     def detect_soft_applied(self, project_state, migration):
         """

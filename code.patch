@@ -1,0 +1,54 @@
+diff --git a/django/db/migrations/executor.py b/django/db/migrations/executor.py
+index 57042a8690..7c54eef95f 100644
+--- a/django/db/migrations/executor.py
++++ b/django/db/migrations/executor.py
+@@ -264,6 +264,7 @@ class MigrationExecutor:
+     def check_replacements(self):
+         """
+         Mark replacement migrations applied if their replaced set all are.
++        Mark replacement migrations unapplied if their replaced set all are not.
+ 
+         Do this unconditionally on every migrate, rather than just when
+         migrations are applied or unapplied, to correctly handle the case
+@@ -275,8 +276,11 @@ class MigrationExecutor:
+         applied = self.recorder.applied_migrations()
+         for key, migration in self.loader.replacements.items():
+             all_applied = all(m in applied for m in migration.replaces)
++            none_applied = not any(m in applied for m in migration.replaces)
+             if all_applied and key not in applied:
+                 self.recorder.record_applied(*key)
++            elif none_applied and key in applied:
++                self.recorder.record_unapplied(*key)
+ 
+     def detect_soft_applied(self, project_state, migration):
+         """
+diff --git a/tests/migrations/test_executor.py b/tests/migrations/test_executor.py
+index e61d8f1276..8a3f03c110 100644
+--- a/tests/migrations/test_executor.py
++++ b/tests/migrations/test_executor.py
+@@ -653,6 +653,25 @@ class ExecutorTests(MigrationTestBase):
+             recorder.applied_migrations(),
+         )
+ 
++    @override_settings(MIGRATION_MODULES={"migrations": "migrations.test_migrations_squashed"})
++    def test_unapply_squashed_migration_marks_replacement_as_unapplied(self):
++        """
++        Unapplying a squashed migration when the replaced migrations are still
++        on disk should mark the squashed migration as unapplied (#14500).
++        """
++        recorder = MigrationRecorder(connection)
++        # Record the squashed migration as applied
++        recorder.record_applied("migrations", "0001_squashed_0002")
++        executor = MigrationExecutor(connection)
++        # Unapply the squashed migration
++        executor.migrate([("migrations", None)], fake=True)
++
++        # The squashed migration should be marked as unapplied
++        self.assertNotIn(
++            ("migrations", "0001_squashed_0002"),
++            recorder.applied_migrations(),
++        )
++
+     # When the feature is False, the operation and the record won't be
+     # performed in a transaction and the test will systematically pass.
+     @skipUnlessDBFeature('can_rollback_ddl')

@@ -653,6 +653,25 @@ class ExecutorTests(MigrationTestBase):
             recorder.applied_migrations(),
         )
 
+    @override_settings(MIGRATION_MODULES={"migrations": "migrations.test_migrations_squashed"})
+    def test_unapply_squashed_migration_marks_replacement_as_unapplied(self):
+        """
+        Unapplying a squashed migration when the replaced migrations are still
+        on disk should mark the squashed migration as unapplied (#14500).
+        """
+        recorder = MigrationRecorder(connection)
+        # Record the squashed migration as applied
+        recorder.record_applied("migrations", "0001_squashed_0002")
+        executor = MigrationExecutor(connection)
+        # Unapply the squashed migration
+        executor.migrate([("migrations", None)], fake=True)
+
+        # The squashed migration should be marked as unapplied
+        self.assertNotIn(
+            ("migrations", "0001_squashed_0002"),
+            recorder.applied_migrations(),
+        )
+
     # When the feature is False, the operation and the record won't be
     # performed in a transaction and the test will systematically pass.
     @skipUnlessDBFeature('can_rollback_ddl')
