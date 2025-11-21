@@ -34,6 +34,7 @@ from django.test import (
     RequestFactory, TestCase, ignore_warnings, override_settings,
 )
 from django.utils import timezone
+from django.utils.deprecation import RemovedInDjango40Warning
 
 from .models import SessionStore as CustomDatabaseSession
 
@@ -311,9 +312,24 @@ class SessionTestsMixin:
         encoded = self.session.encode(data)
         self.assertEqual(self.session.decode(encoded), data)
 
-    @override_settings(SECRET_KEY='django_tests_secret_key')
+    @ignore_warnings(category=RemovedInDjango40Warning)
+    @override_settings(SECRET_KEY='django_tests_secret_key', DEFAULT_HASHING_ALGORITHM='sha1')
     def test_decode_legacy(self):
         # RemovedInDjango40Warning: pre-Django 3.1 sessions will be invalid.
+        legacy_encoded = (
+            'OWUzNTNmNWQxNTBjOWExZmM4MmQ3NzNhMDRmMjU4NmYwNDUyNGI2NDp7ImEgdGVzd'
+            'CBrZXkiOiJhIHRlc3QgdmFsdWUifQ=='
+        )
+        self.assertEqual(
+            self.session.decode(legacy_encoded),
+            {'a test key': 'a test value'},
+        )
+
+    @ignore_warnings(category=RemovedInDjango40Warning)
+    @override_settings(SECRET_KEY='django_tests_secret_key', DEFAULT_HASHING_ALGORITHM='sha1')
+    def test_decode_legacy_with_sha1_algorithm(self):
+        # Test that legacy sessions can be decoded when DEFAULT_HASHING_ALGORITHM='sha1'
+        # This is important for the transition to Django 3.1 when running multiple instances
         legacy_encoded = (
             'OWUzNTNmNWQxNTBjOWExZmM4MmQ3NzNhMDRmMjU4NmYwNDUyNGI2NDp7ImEgdGVzd'
             'CBrZXkiOiJhIHRlc3QgdmFsdWUifQ=='

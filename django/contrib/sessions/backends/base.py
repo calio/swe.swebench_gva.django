@@ -104,7 +104,7 @@ class SessionBase:
     def _hash(self, value):
         # RemovedInDjango40Warning: pre-Django 3.1 format will be invalid.
         key_salt = "django.contrib.sessions" + self.__class__.__name__
-        return salted_hmac(key_salt, value).hexdigest()
+        return salted_hmac(key_salt, value, algorithm=settings.DEFAULT_HASHING_ALGORITHM).hexdigest()
 
     def encode(self, session_dict):
         "Return the given session dictionary serialized and encoded as a string."
