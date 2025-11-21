@@ -1,3 +1,4 @@
+from collections import namedtuple
 from datetime import datetime
 
 from django.core.exceptions import FieldError
@@ -5,7 +6,7 @@ from django.db.models import BooleanField, CharField, F, Q
 from django.db.models.expressions import Col, Func
 from django.db.models.fields.related_lookups import RelatedIsNull
 from django.db.models.functions import Lower
-from django.db.models.lookups import Exact, GreaterThan, IsNull, LessThan
+from django.db.models.lookups import Exact, GreaterThan, IsNull, LessThan, Range
 from django.db.models.sql.query import Query
 from django.db.models.sql.where import OR
 from django.test import SimpleTestCase
@@ -150,3 +151,13 @@ class TestQuery(SimpleTestCase):
         msg = 'Cannot filter against a non-conditional expression.'
         with self.assertRaisesMessage(TypeError, msg):
             query.build_where(Func(output_field=CharField()))
+
+    def test_named_tuple_lookup_value(self):
+        """Test that named tuples used as lookup values don't cause TypeError."""
+        RangeValue = namedtuple('RangeValue', ['near', 'far'])
+        range_value = RangeValue(1, 10)
+        query = Query(Item)
+        # This should not raise TypeError: __new__() missing 1 required positional argument
+        where = query.build_where(Q(name__range=range_value))
+        lookup = where.children[0]
+        self.assertIsInstance(lookup, Range)

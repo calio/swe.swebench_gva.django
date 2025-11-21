@@ -1077,10 +1077,16 @@ class Query(BaseExpression):
         elif isinstance(value, (list, tuple)):
             # The items of the iterable may be expressions and therefore need
             # to be resolved independently.
-            return type(value)(
+            resolved_values = [
                 self.resolve_lookup_value(sub_value, can_reuse, allow_joins)
                 for sub_value in value
-            )
+            ]
+            # Named tuples need unpacking, but regular tuples and lists don't.
+            # Named tuples have a _fields attribute that regular tuples don't.
+            if isinstance(value, tuple) and hasattr(value, '_fields'):
+                return type(value)(*resolved_values)
+            else:
+                return type(value)(resolved_values)
         return value
 
     def solve_lookup_type(self, lookup):
