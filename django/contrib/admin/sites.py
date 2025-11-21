@@ -420,7 +420,7 @@ class AdminSite:
     def catch_all_view(self, request, url):
         if settings.APPEND_SLASH and not url.endswith('/'):
             urlconf = getattr(request, 'urlconf', None)
-            path = '%s/' % request.path_info
+            path = '%s/' % request.path
             try:
                 match = resolve(path, urlconf)
             except Resolver404:

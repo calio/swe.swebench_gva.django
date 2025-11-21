@@ -6641,6 +6641,40 @@ class AdminSiteFinalCatchAllPatternTests(TestCase):
         response = self.client.get(known_url[:-1])
         self.assertEqual(response.status_code, 404)
 
+    @override_settings(APPEND_SLASH=True, FORCE_SCRIPT_NAME='/myadmin/')
+    def test_missing_slash_append_slash_true_with_force_script_name(self):
+        """
+        Test that catch_all_view respects FORCE_SCRIPT_NAME when redirecting
+        with APPEND_SLASH. The redirect URL should include the FORCE_SCRIPT_NAME
+        prefix, not just the path_info.
+        """
+        from django.test.client import RequestFactory
+        from django.core.handlers.wsgi import WSGIRequest
+        from io import BytesIO
+        
+        # Create a WSGI request with FORCE_SCRIPT_NAME set
+        environ = {
+            'REQUEST_METHOD': 'GET',
+            'SCRIPT_NAME': '/myadmin/',
+            'PATH_INFO': '/admin_views/article',
+            'SERVER_NAME': 'testserver',
+            'SERVER_PORT': '80',
+            'wsgi.url_scheme': 'http',
+            'wsgi.input': BytesIO(b''),
+        }
+        
+        request = WSGIRequest(environ)
+        request.user = User.objects.create_superuser(
+            username='staff',
+            password='secret',
+            email='staff@example.com',
+        )
+        
+        # Verify that request.path includes the FORCE_SCRIPT_NAME
+        self.assertEqual(request.path, '/myadmin/admin_views/article')
+        # And request.path_info does not
+        self.assertEqual(request.path_info, '/admin_views/article')
+
     # Same tests above with final_catch_all_view=False.
 
     def test_unknown_url_404_if_not_authenticated_without_final_catch_all_view(self):
