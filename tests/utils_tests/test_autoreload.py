@@ -230,6 +230,40 @@ class TestChildArguments(SimpleTestCase):
                 [sys.executable, __file__, 'runserver']
             )
 
+    @mock.patch('sys.argv', [__file__, 'runserver'])
+    @mock.patch('sys.warnoptions', [])
+    def test_run_as_nested_module(self):
+        """Test that nested modules like foo.bar.baz preserve the full module path."""
+        # Create a mock module with __spec__ that has a nested name
+        module = types.ModuleType('__main__')
+        spec = types.SimpleNamespace(
+            name='utils_tests.test_module.child_module',
+            parent='utils_tests.test_module',
+        )
+        module.__spec__ = spec
+        with mock.patch.dict(sys.modules, {'__main__': module}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-m', 'utils_tests.test_module.child_module', 'runserver']
+            )
+
+    @mock.patch('sys.argv', [__file__, 'runserver'])
+    @mock.patch('sys.warnoptions', [])
+    def test_run_as_deeply_nested_module(self):
+        """Test that deeply nested modules preserve the full module path."""
+        # Create a mock module with __spec__ that has a deeply nested name
+        module = types.ModuleType('__main__')
+        spec = types.SimpleNamespace(
+            name='utils_tests.test_module.child_module.grandchild',
+            parent='utils_tests.test_module.child_module',
+        )
+        module.__spec__ = spec
+        with mock.patch.dict(sys.modules, {'__main__': module}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-m', 'utils_tests.test_module.child_module.grandchild', 'runserver']
+            )
+
 
 class TestUtilities(SimpleTestCase):
     def test_is_django_module(self):
