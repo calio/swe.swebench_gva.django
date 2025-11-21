@@ -21,6 +21,28 @@ class RenderToStringTest(SimpleTestCase):
             'obj:test\n',
         )
 
+    def test_autoescape_false(self):
+        """
+        Test that Engine.render_to_string() honors the autoescape=False setting.
+        """
+        engine = Engine(dirs=[TEMPLATE_DIR], autoescape=False)
+        # Create a template with HTML content
+        result = engine.render_to_string('test_context.html', {'obj': '<script>alert("xss")</script>'})
+        # With autoescape=False, the HTML should not be escaped
+        self.assertIn('<script>', result)
+        self.assertNotIn('&lt;script&gt;', result)
+
+    def test_autoescape_true(self):
+        """
+        Test that Engine.render_to_string() honors the autoescape=True setting.
+        """
+        engine = Engine(dirs=[TEMPLATE_DIR], autoescape=True)
+        # Create a template with HTML content
+        result = engine.render_to_string('test_context.html', {'obj': '<script>alert("xss")</script>'})
+        # With autoescape=True, the HTML should be escaped
+        self.assertIn('&lt;script&gt;', result)
+        self.assertNotIn('<script>', result)
+
 
 class GetDefaultTests(SimpleTestCase):
 
