@@ -87,7 +87,12 @@ class Q(tree.Node):
         args, kwargs = (), {}
         if len(self.children) == 1 and not isinstance(self.children[0], Q):
             child = self.children[0]
-            kwargs = {child[0]: child[1]}
+            # Check if the child is a tuple (from kwargs.items())
+            if isinstance(child, tuple) and len(child) == 2:
+                kwargs = {child[0]: child[1]}
+            else:
+                # Child is a positional argument (e.g., Exists, other expressions)
+                args = (child,)
         else:
             args = tuple(self.children)
             if self.connector != self.default:

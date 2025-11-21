@@ -1,4 +1,4 @@
-from django.db.models import F, Q
+from django.db.models import Exists, F, Q
 from django.test import SimpleTestCase
 
 
@@ -111,3 +111,32 @@ class QTests(SimpleTestCase):
         q = q1 & q2
         path, args, kwargs = q.deconstruct()
         self.assertEqual(Q(*args, **kwargs), q)
+
+    def test_deconstruct_with_exists(self):
+        # Test that Q objects with non-subscriptable children (like Exists)
+        # can be deconstructed without raising TypeError.
+        from django.contrib.auth.models import User
+        exists_expr = Exists(User.objects.filter(username='jim'))
+        q = Q(exists_expr)
+        path, args, kwargs = q.deconstruct()
+        self.assertEqual(path, 'django.db.models.Q')
+        self.assertEqual(len(args), 1)
+        self.assertIsInstance(args[0], Exists)
+        self.assertEqual(kwargs, {})
+
+    def test_reconstruct_with_exists(self):
+        # Test that Q objects with Exists can be reconstructed after deconstruct.
+        from django.contrib.auth.models import User
+        exists_expr = Exists(User.objects.filter(username='jim'))
+        q = Q(exists_expr)
+        path, args, kwargs = q.deconstruct()
+        q_reconstructed = Q(*args, **kwargs)
+        self.assertEqual(q, q_reconstructed)
+
+    def test_combine_empty_q_with_exists(self):
+        # Test that combining an empty Q with Exists works correctly.
+        from django.contrib.auth.models import User
+        exists_expr = Exists(User.objects.filter(username='jim'))
+        q = Q() | exists_expr
+        # The result should be the Exists expression itself
+        self.assertEqual(q, exists_expr)
