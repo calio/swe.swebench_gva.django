@@ -128,9 +128,28 @@ class BasicFieldTests(SimpleTestCase):
         self.assertLess(abstract_model_field, inherit2_model_field)
         self.assertLess(inherit1_model_field, inherit2_model_field)
 
-        self.assertNotEqual(hash(abstract_model_field), hash(inherit1_model_field))
-        self.assertNotEqual(hash(abstract_model_field), hash(inherit2_model_field))
-        self.assertNotEqual(hash(inherit1_model_field), hash(inherit2_model_field))
+    def test_field_hash_is_stable(self):
+        """Field hash should not change when assigned to a model."""
+        field = models.CharField(max_length=200)
+        hash_before = hash(field)
+        
+        # Use field as dict key before assignment
+        d = {field: 'value'}
+        
+        # Assign field to a model
+        class TestModel(models.Model):
+            title = field
+            
+            class Meta:
+                app_label = 'test'
+        
+        # Hash should remain the same
+        hash_after = hash(field)
+        self.assertEqual(hash_before, hash_after)
+        
+        # Field should still be accessible in dict
+        self.assertIn(field, d)
+        self.assertEqual(d[field], 'value')
 
 
 class ChoicesTests(SimpleTestCase):
