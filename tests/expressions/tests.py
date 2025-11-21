@@ -1648,6 +1648,25 @@ class FTimeDeltaTests(TestCase):
         e0 = Experiment.objects.get(name='e0')
         self.assertEqual(e0.start, expected_start)
 
+    def test_duration_only_expression_annotation(self):
+        """Test that duration-only expressions work in annotations."""
+        delta = datetime.timedelta(days=1)
+        # Test addition
+        queryset = Experiment.objects.annotate(duration=F('estimated_time') + delta)
+        result = list(queryset)
+        self.assertEqual(len(result), 6)
+        # Check that the duration is correctly calculated
+        for exp in result:
+            self.assertEqual(exp.duration, exp.estimated_time + delta)
+        
+        # Test subtraction
+        queryset = Experiment.objects.annotate(duration=F('estimated_time') - delta)
+        result = list(queryset)
+        self.assertEqual(len(result), 6)
+        # Check that the duration is correctly calculated
+        for exp in result:
+            self.assertEqual(exp.duration, exp.estimated_time - delta)
+
 
 class ValueTests(TestCase):
     def test_update_TimeField_using_Value(self):
