@@ -211,6 +211,17 @@ class BulkUpdateTests(TestCase):
         Number.objects.bulk_update(numbers, ['num'])
         self.assertCountEqual(Number.objects.filter(num=1), numbers)
 
+    def test_plain_field_references(self):
+        """Test that plain F() expressions work with bulk_update()."""
+        numbers = [Number.objects.create(num=i) for i in range(10)]
+        for number in numbers:
+            number.num = F('num')
+        Number.objects.bulk_update(numbers, ['num'])
+        # After bulk_update with F('num'), values should remain unchanged
+        for number in numbers:
+            number.refresh_from_db()
+            self.assertEqual(number.num, numbers[numbers.index(number)].num)
+
     def test_booleanfield(self):
         individuals = [Individual.objects.create(alive=False) for _ in range(10)]
         for individual in individuals:
