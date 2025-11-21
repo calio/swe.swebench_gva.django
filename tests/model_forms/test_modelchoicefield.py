@@ -2,7 +2,7 @@ import datetime
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.forms.models import ModelChoiceIterator
+from django.forms.models import ModelChoiceIterator, ModelChoiceIteratorValue
 from django.forms.widgets import CheckboxSelectMultiple
 from django.template import Context, Template
 from django.test import TestCase
@@ -373,3 +373,30 @@ class ModelChoiceFieldTests(TestCase):
         )
         with self.assertNumQueries(2):
             template.render(Context({'form': CategoriesForm()}))
+
+    def test_modelchoiceiteratorvalue_hashable(self):
+        """
+        ModelChoiceIteratorValue should be hashable so it can be used as a
+        dictionary key or in set operations.
+        """
+        # Create instances of ModelChoiceIteratorValue
+        value1 = ModelChoiceIteratorValue(self.c1.pk, self.c1)
+        value2 = ModelChoiceIteratorValue(self.c2.pk, self.c2)
+        value3 = ModelChoiceIteratorValue(self.c1.pk, self.c1)
+
+        # Test that they can be used as dictionary keys
+        test_dict = {value1: 'first', value2: 'second'}
+        self.assertEqual(test_dict[value1], 'first')
+        self.assertEqual(test_dict[value2], 'second')
+
+        # Test that they can be used in sets
+        test_set = {value1, value2, value3}
+        # value1 and value3 have the same pk, so they should be considered equal
+        self.assertEqual(len(test_set), 2)
+
+        # Test that equal values have the same hash
+        self.assertEqual(hash(value1), hash(value3))
+
+        # Test that they can be used with 'in' operator on dictionaries
+        self.assertIn(value1, test_dict)
+        self.assertIn(value2, test_dict)
