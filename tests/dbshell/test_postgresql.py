@@ -94,3 +94,52 @@ class PostgreSqlDbshellCommandTestCase(SimpleTestCase):
             DatabaseClient.runshell_db({})
         # dbshell restores the original handler.
         self.assertEqual(sigint_handler, signal.getsignal(signal.SIGINT))
+
+    def test_ssl_certificate_is_added(self):
+        self.assertEqual(
+            self._run_it({
+                'database': 'dbname',
+                'user': 'someuser',
+                'password': 'somepassword',
+                'host': 'somehost',
+                'port': '444',
+                'sslmode': 'require',
+                'sslrootcert': '/path/to/ca.crt',
+                'sslcert': '/path/to/client.crt',
+                'sslkey': '/path/to/client.key',
+            }), (
+                [
+                    'psql', '-U', 'someuser', '-h', 'somehost', '-p', '444',
+                    '-v', 'sslmode=require',
+                    '-v', 'sslrootcert=/path/to/ca.crt',
+                    '-v', 'sslcert=/path/to/client.crt',
+                    '-v', 'sslkey=/path/to/client.key',
+                    'dbname'
+                ],
+                'somepassword',
+            )
+        )
+
+    def test_ssl_certificate_is_added_with_verify_ca(self):
+        self.assertEqual(
+            self._run_it({
+                'database': 'dbname',
+                'user': 'someuser',
+                'host': 'somehost',
+                'port': '444',
+                'sslmode': 'verify-ca',
+                'sslrootcert': '/path/to/ca.crt',
+                'sslcert': '/path/to/client.crt',
+                'sslkey': '/path/to/client.key',
+            }), (
+                [
+                    'psql', '-U', 'someuser', '-h', 'somehost', '-p', '444',
+                    '-v', 'sslmode=verify-ca',
+                    '-v', 'sslrootcert=/path/to/ca.crt',
+                    '-v', 'sslcert=/path/to/client.crt',
+                    '-v', 'sslkey=/path/to/client.key',
+                    'dbname'
+                ],
+                None,
+            )
+        )

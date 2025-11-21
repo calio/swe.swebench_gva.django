@@ -1,0 +1,87 @@
+diff --git a/django/db/backends/postgresql/client.py b/django/db/backends/postgresql/client.py
+index cf4df76882..17077b56aa 100644
+--- a/django/db/backends/postgresql/client.py
++++ b/django/db/backends/postgresql/client.py
+@@ -17,6 +17,10 @@ class DatabaseClient(BaseDatabaseClient):
+         dbname = conn_params.get('database', '')
+         user = conn_params.get('user', '')
+         passwd = conn_params.get('password', '')
++        sslmode = conn_params.get('sslmode', '')
++        sslrootcert = conn_params.get('sslrootcert', '')
++        sslcert = conn_params.get('sslcert', '')
++        sslkey = conn_params.get('sslkey', '')
+ 
+         if user:
+             args += ['-U', user]
+@@ -24,6 +28,14 @@ class DatabaseClient(BaseDatabaseClient):
+             args += ['-h', host]
+         if port:
+             args += ['-p', str(port)]
++        if sslmode:
++            args += ['-v', 'sslmode=%s' % sslmode]
++        if sslrootcert:
++            args += ['-v', 'sslrootcert=%s' % sslrootcert]
++        if sslcert:
++            args += ['-v', 'sslcert=%s' % sslcert]
++        if sslkey:
++            args += ['-v', 'sslkey=%s' % sslkey]
+         args += [dbname]
+ 
+         sigint_handler = signal.getsignal(signal.SIGINT)
+diff --git a/tests/dbshell/test_postgresql.py b/tests/dbshell/test_postgresql.py
+index a33e7f6482..886c05e669 100644
+--- a/tests/dbshell/test_postgresql.py
++++ b/tests/dbshell/test_postgresql.py
+@@ -94,3 +94,52 @@ class PostgreSqlDbshellCommandTestCase(SimpleTestCase):
+             DatabaseClient.runshell_db({})
+         # dbshell restores the original handler.
+         self.assertEqual(sigint_handler, signal.getsignal(signal.SIGINT))
++
++    def test_ssl_certificate_is_added(self):
++        self.assertEqual(
++            self._run_it({
++                'database': 'dbname',
++                'user': 'someuser',
++                'password': 'somepassword',
++                'host': 'somehost',
++                'port': '444',
++                'sslmode': 'require',
++                'sslrootcert': '/path/to/ca.crt',
++                'sslcert': '/path/to/client.crt',
++                'sslkey': '/path/to/client.key',
++            }), (
++                [
++                    'psql', '-U', 'someuser', '-h', 'somehost', '-p', '444',
++                    '-v', 'sslmode=require',
++                    '-v', 'sslrootcert=/path/to/ca.crt',
++                    '-v', 'sslcert=/path/to/client.crt',
++                    '-v', 'sslkey=/path/to/client.key',
++                    'dbname'
++                ],
++                'somepassword',
++            )
++        )
++
++    def test_ssl_certificate_is_added_with_verify_ca(self):
++        self.assertEqual(
++            self._run_it({
++                'database': 'dbname',
++                'user': 'someuser',
++                'host': 'somehost',
++                'port': '444',
++                'sslmode': 'verify-ca',
++                'sslrootcert': '/path/to/ca.crt',
++                'sslcert': '/path/to/client.crt',
++                'sslkey': '/path/to/client.key',
++            }), (
++                [
++                    'psql', '-U', 'someuser', '-h', 'somehost', '-p', '444',
++                    '-v', 'sslmode=verify-ca',
++                    '-v', 'sslrootcert=/path/to/ca.crt',
++                    '-v', 'sslcert=/path/to/client.crt',
++                    '-v', 'sslkey=/path/to/client.key',
++                    'dbname'
++                ],
++                None,
++            )
++        )

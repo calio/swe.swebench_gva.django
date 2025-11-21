@@ -17,6 +17,10 @@ class DatabaseClient(BaseDatabaseClient):
         dbname = conn_params.get('database', '')
         user = conn_params.get('user', '')
         passwd = conn_params.get('password', '')
+        sslmode = conn_params.get('sslmode', '')
+        sslrootcert = conn_params.get('sslrootcert', '')
+        sslcert = conn_params.get('sslcert', '')
+        sslkey = conn_params.get('sslkey', '')
 
         if user:
             args += ['-U', user]
@@ -24,6 +28,14 @@ class DatabaseClient(BaseDatabaseClient):
             args += ['-h', host]
         if port:
             args += ['-p', str(port)]
+        if sslmode:
+            args += ['-v', 'sslmode=%s' % sslmode]
+        if sslrootcert:
+            args += ['-v', 'sslrootcert=%s' % sslrootcert]
+        if sslcert:
+            args += ['-v', 'sslcert=%s' % sslcert]
+        if sslkey:
+            args += ['-v', 'sslkey=%s' % sslkey]
         args += [dbname]
 
         sigint_handler = signal.getsignal(signal.SIGINT)
