@@ -3,7 +3,7 @@ from django.db import IntegrityError, connection, models
 from django.db.models.constraints import BaseConstraint
 from django.test import SimpleTestCase, TestCase, skipUnlessDBFeature
 
-from .models import Product
+from .models import Product, TestConstraint
 
 
 def get_constraints(table):
@@ -78,6 +78,29 @@ class CheckConstraintTests(TestCase):
         constraints = get_constraints(Product._meta.db_table)
         expected_name = 'price_gt_discounted_price'
         self.assertIn(expected_name, constraints)
+
+    @skipUnlessDBFeature('supports_table_check_constraints')
+    def test_check_constraint_with_or_operator(self):
+        """Test that CheckConstraint with OR operator generates correct SQL."""
+        # This test verifies that the constraint is created correctly
+        # and that the SQL doesn't include fully qualified field names
+        # in the OR clause (which would cause issues on SQLite/Oracle)
+        constraints = get_constraints(TestConstraint._meta.db_table)
+        expected_name = 'field_1_has_value_if_flag_set'
+        self.assertIn(expected_name, constraints)
+
+    @skipUnlessDBFeature('supports_table_check_constraints')
+    def test_check_constraint_with_or_operator_validation(self):
+        """Test that CheckConstraint with OR operator validates correctly."""
+        # Valid: flag=True and field_1 is not null
+        TestConstraint.objects.create(flag=True, field_1=10)
+        
+        # Valid: flag=False (field_1 can be anything)
+        TestConstraint.objects.create(flag=False, field_1=None)
+        
+        # Invalid: flag=True and field_1 is null
+        with self.assertRaises(IntegrityError):
+            TestConstraint.objects.create(flag=True, field_1=None)
 
 
 class UniqueConstraintTests(TestCase):

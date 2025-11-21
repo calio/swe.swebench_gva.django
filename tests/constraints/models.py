@@ -20,3 +20,17 @@ class Product(models.Model):
                 condition=models.Q(color__isnull=True),
             ),
         ]
+
+
+class TestConstraint(models.Model):
+    field_1 = models.IntegerField(blank=True, null=True)
+    flag = models.BooleanField(blank=False, null=False)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(flag__exact=True, field_1__isnull=False) |
+                      models.Q(flag__exact=False),
+                name='field_1_has_value_if_flag_set',
+            ),
+        ]

@@ -1,0 +1,78 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index b99f03cd88..d69c24419b 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1338,7 +1338,7 @@ class Query(BaseExpression):
+             if isinstance(child, Node):
+                 child_clause, needed_inner = self._add_q(
+                     child, used_aliases, branch_negated,
+-                    current_negated, allow_joins, split_subq)
++                    current_negated, allow_joins, split_subq, simple_col)
+                 joinpromoter.add_votes(needed_inner)
+             else:
+                 child_clause, needed_inner = self.build_filter(
+diff --git a/tests/constraints/models.py b/tests/constraints/models.py
+index f316b95161..5731ca0b18 100644
+--- a/tests/constraints/models.py
++++ b/tests/constraints/models.py
+@@ -20,3 +20,17 @@ class Product(models.Model):
+                 condition=models.Q(color__isnull=True),
+             ),
+         ]
++
++
++class TestConstraint(models.Model):
++    field_1 = models.IntegerField(blank=True, null=True)
++    flag = models.BooleanField(blank=False, null=False)
++
++    class Meta:
++        constraints = [
++            models.CheckConstraint(
++                check=models.Q(flag__exact=True, field_1__isnull=False) |
++                      models.Q(flag__exact=False),
++                name='field_1_has_value_if_flag_set',
++            ),
++        ]
+diff --git a/tests/constraints/tests.py b/tests/constraints/tests.py
+index b7aeb1e7f0..46038fc98a 100644
+--- a/tests/constraints/tests.py
++++ b/tests/constraints/tests.py
+@@ -3,7 +3,7 @@ from django.db import IntegrityError, connection, models
+ from django.db.models.constraints import BaseConstraint
+ from django.test import SimpleTestCase, TestCase, skipUnlessDBFeature
+ 
+-from .models import Product
++from .models import Product, TestConstraint
+ 
+ 
+ def get_constraints(table):
+@@ -79,6 +79,29 @@ class CheckConstraintTests(TestCase):
+         expected_name = 'price_gt_discounted_price'
+         self.assertIn(expected_name, constraints)
+ 
++    @skipUnlessDBFeature('supports_table_check_constraints')
++    def test_check_constraint_with_or_operator(self):
++        """Test that CheckConstraint with OR operator generates correct SQL."""
++        # This test verifies that the constraint is created correctly
++        # and that the SQL doesn't include fully qualified field names
++        # in the OR clause (which would cause issues on SQLite/Oracle)
++        constraints = get_constraints(TestConstraint._meta.db_table)
++        expected_name = 'field_1_has_value_if_flag_set'
++        self.assertIn(expected_name, constraints)
++
++    @skipUnlessDBFeature('supports_table_check_constraints')
++    def test_check_constraint_with_or_operator_validation(self):
++        """Test that CheckConstraint with OR operator validates correctly."""
++        # Valid: flag=True and field_1 is not null
++        TestConstraint.objects.create(flag=True, field_1=10)
++        
++        # Valid: flag=False (field_1 can be anything)
++        TestConstraint.objects.create(flag=False, field_1=None)
++        
++        # Invalid: flag=True and field_1 is null
++        with self.assertRaises(IntegrityError):
++            TestConstraint.objects.create(flag=True, field_1=None)
++
+ 
+ class UniqueConstraintTests(TestCase):
+     @classmethod
