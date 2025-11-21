@@ -29,16 +29,23 @@ def format(number, decimal_sep, decimal_pos=None, grouping=0, thousand_sep='',
     if isinstance(number, Decimal):
         # Format values with more than 200 digits (an arbitrary cutoff) using
         # scientific notation to avoid high memory usage in {:f}'.format().
-        _, digits, exponent = number.as_tuple()
+        sign_tuple, digits, exponent = number.as_tuple()
         if abs(exponent) + len(digits) > 200:
-            number = '{:e}'.format(number)
-            coefficient, exponent = number.split('e')
-            # Format the coefficient.
-            coefficient = format(
-                coefficient, decimal_sep, decimal_pos, grouping,
-                thousand_sep, force_grouping, use_l10n,
-            )
-            return '{}e{}'.format(coefficient, exponent)
+            # If decimal_pos is specified and the number is small enough to be
+            # represented with that many decimal places, format it as zero.
+            if decimal_pos is not None and exponent < 0:
+                # The number is too small to be represented with the specified
+                # decimal_pos, so it will round to zero.
+                str_number = '0'
+            else:
+                number = '{:e}'.format(number)
+                coefficient, exponent = number.split('e')
+                # Format the coefficient.
+                coefficient = format(
+                    coefficient, decimal_sep, decimal_pos, grouping,
+                    thousand_sep, force_grouping, use_l10n,
+                )
+                return '{}e{}'.format(coefficient, exponent)
         else:
             str_number = '{:f}'.format(number)
     else:
