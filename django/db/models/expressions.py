@@ -1299,6 +1299,14 @@ class When(Expression):
         template_params = extra_context
         sql_params = []
         condition_sql, condition_params = compiler.compile(self.condition)
+        # If the condition SQL is empty, it means the condition matches everything
+        # (e.g., ~Q(pk__in=[])), so we need to use a condition that is always true.
+        if not condition_sql:
+            features = compiler.connection.features
+            if not features.supports_boolean_expr_in_select_clause:
+                condition_sql = "1=1"
+            else:
+                condition_sql, condition_params = compiler.compile(Value(True))
         template_params["condition"] = condition_sql
         sql_params.extend(condition_params)
         result_sql, result_params = compiler.compile(self.result)

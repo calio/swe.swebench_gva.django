@@ -1491,6 +1491,21 @@ class CaseExpressionTests(TestCase):
                     transform=itemgetter("string", "case", "integer_sum"),
                 )
 
+    def test_negated_empty_q_object(self):
+        """Test that Case() works with ~Q(pk__in=[])"""
+        result = CaseTestModel.objects.annotate(
+            _a=Case(
+                When(~Q(pk__in=[]), then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        ).order_by('pk').values('pk', '_a')
+        result_list = list(result)
+        # All rows should have _a=True since ~Q(pk__in=[]) matches everything
+        self.assertEqual(len(result_list), 7)
+        for row in result_list:
+            self.assertTrue(row['_a'])
+
 
 class CaseDocumentationExamples(TestCase):
     @classmethod
