@@ -235,6 +235,20 @@ class SomeChildModelInline(admin.TabularInline):
     readonly_fields = ('readonly_field',)
 
 
+# admin for get_inlines() hook
+class GetInlinesAdmin(admin.ModelAdmin):
+    """Admin that uses get_inlines() hook to conditionally select inlines."""
+    
+    def get_inlines(self, request, obj=None):
+        # Return different inlines based on whether we're adding or changing
+        if obj is None:
+            # On add page, return only TitleInline
+            return [TitleInline]
+        else:
+            # On change page, return both inlines
+            return [TitleInline]
+
+
 site.register(TitleCollection, inlines=[TitleInline])
 # Test bug #12561 and #12778
 # only ModelAdmin media

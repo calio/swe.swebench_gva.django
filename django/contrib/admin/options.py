@@ -580,9 +580,19 @@ class ModelAdmin(BaseModelAdmin):
     def __str__(self):
         return "%s.%s" % (self.model._meta.app_label, self.__class__.__name__)
 
+    def get_inlines(self, request, obj=None):
+        """
+        Return a list of InlineModelAdmin classes for use on the add/change pages.
+
+        By default, returns the value of the :attr:`inlines` attribute. You can
+        override this method to dynamically select inlines based on the request
+        or model instance.
+        """
+        return self.inlines
+
     def get_inline_instances(self, request, obj=None):
         inline_instances = []
-        for inline_class in self.inlines:
+        for inline_class in self.get_inlines(request, obj):
             inline = inline_class(self.model, self.admin_site)
             if request:
                 if not (inline.has_view_or_change_permission(request, obj) or

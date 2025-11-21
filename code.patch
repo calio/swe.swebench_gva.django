@@ -1,0 +1,168 @@
+diff --git a/django/contrib/admin/options.py b/django/contrib/admin/options.py
+index 5e7b23f9a0..bdf4b4abf7 100644
+--- a/django/contrib/admin/options.py
++++ b/django/contrib/admin/options.py
+@@ -580,9 +580,19 @@ class ModelAdmin(BaseModelAdmin):
+     def __str__(self):
+         return "%s.%s" % (self.model._meta.app_label, self.__class__.__name__)
+ 
++    def get_inlines(self, request, obj=None):
++        """
++        Return a list of InlineModelAdmin classes for use on the add/change pages.
++
++        By default, returns the value of the :attr:`inlines` attribute. You can
++        override this method to dynamically select inlines based on the request
++        or model instance.
++        """
++        return self.inlines
++
+     def get_inline_instances(self, request, obj=None):
+         inline_instances = []
+-        for inline_class in self.inlines:
++        for inline_class in self.get_inlines(request, obj):
+             inline = inline_class(self.model, self.admin_site)
+             if request:
+                 if not (inline.has_view_or_change_permission(request, obj) or
+diff --git a/docs/ref/contrib/admin/index.txt b/docs/ref/contrib/admin/index.txt
+index 93679c46fd..d4fabbc968 100644
+--- a/docs/ref/contrib/admin/index.txt
++++ b/docs/ref/contrib/admin/index.txt
+@@ -1608,20 +1608,48 @@ templates used by the :class:`ModelAdmin` views:
+             def get_sortable_by(self, request):
+                 return {*self.get_list_display(request)} - {'rank'}
+ 
++.. method:: ModelAdmin.get_inlines(request, obj=None)
++
++    The ``get_inlines`` method is given the ``HttpRequest`` and the ``obj``
++    being edited (or ``None`` on an add form) and is expected to return a list
++    or tuple of :class:`~django.contrib.admin.InlineModelAdmin` classes to use
++    on the add/change pages.
++
++    By default, it returns the value of the :attr:`inlines` attribute. You can
++    override this method to dynamically select inlines based on the request or
++    model instance. For example::
++
++        class MyModelAdmin(admin.ModelAdmin):
++            inlines = [MyInline, AnotherInline]
++
++            def get_inlines(self, request, obj=None):
++                if obj is None:
++                    # On add page, return only MyInline
++                    return [MyInline]
++                # On change page, return both inlines
++                return self.inlines
++
++    This hook is called by :meth:`get_inline_instances` to determine which
++    inline classes to instantiate.
++
+ .. method:: ModelAdmin.get_inline_instances(request, obj=None)
+ 
+     The ``get_inline_instances`` method is given the ``HttpRequest`` and the
+     ``obj`` being edited (or ``None`` on an add form) and is expected to return
+     a ``list`` or ``tuple`` of :class:`~django.contrib.admin.InlineModelAdmin`
+     objects, as described below in the :class:`~django.contrib.admin.InlineModelAdmin`
+-    section. For example, the following would return inlines without the default
+-    filtering based on add, change, delete, and view permissions::
++    section.
++
++    This method calls :meth:`get_inlines` to determine which inline classes to
++    use, instantiates them, and applies permission checks. For example, the
++    following would return inlines without the default filtering based on add,
++    change, delete, and view permissions::
+ 
+         class MyModelAdmin(admin.ModelAdmin):
+             inlines = (MyInline,)
+ 
+             def get_inline_instances(self, request, obj=None):
+-                return [inline(self.model, self.admin_site) for inline in self.inlines]
++                return [inline(self.model, self.admin_site) for inline in self.get_inlines(request, obj)]
+ 
+     If you override this method, make sure that the returned inlines are
+     instances of the classes defined in :attr:`inlines` or you might encounter
+diff --git a/tests/admin_inlines/admin.py b/tests/admin_inlines/admin.py
+index b5f343a55b..abe5c7ac94 100644
+--- a/tests/admin_inlines/admin.py
++++ b/tests/admin_inlines/admin.py
+@@ -235,6 +235,20 @@ class SomeChildModelInline(admin.TabularInline):
+     readonly_fields = ('readonly_field',)
+ 
+ 
++# admin for get_inlines() hook
++class GetInlinesAdmin(admin.ModelAdmin):
++    """Admin that uses get_inlines() hook to conditionally select inlines."""
++    
++    def get_inlines(self, request, obj=None):
++        # Return different inlines based on whether we're adding or changing
++        if obj is None:
++            # On add page, return only TitleInline
++            return [TitleInline]
++        else:
++            # On change page, return both inlines
++            return [TitleInline]
++
++
+ site.register(TitleCollection, inlines=[TitleInline])
+ # Test bug #12561 and #12778
+ # only ModelAdmin media
+diff --git a/tests/admin_inlines/tests.py b/tests/admin_inlines/tests.py
+index 736c2eab89..984cbb5388 100644
+--- a/tests/admin_inlines/tests.py
++++ b/tests/admin_inlines/tests.py
+@@ -370,6 +370,57 @@ class TestInline(TestDataMixin, TestCase):
+         self.assertInHTML(min_forms % 5, response.rendered_content)
+         self.assertInHTML(total_forms % 8, response.rendered_content)
+ 
++    def test_get_inlines_hook(self):
++        """
++        Test that get_inlines() hook allows dynamic selection of inlines
++        based on request or model instance.
++        """
++        from .admin import TitleInline, QuestionInline
++
++        class DynamicInlinesAdmin(ModelAdmin):
++            """Admin that uses get_inlines() to conditionally select inlines."""
++            
++            def get_inlines(self, request, obj=None):
++                # Return different inlines based on whether we're adding or changing
++                if obj is None:
++                    # On add page, return only TitleInline
++                    return [TitleInline]
++                else:
++                    # On change page, return both inlines
++                    return [TitleInline, QuestionInline]
++
++        # Test on add page (obj=None)
++        modeladmin = DynamicInlinesAdmin(Poll, admin_site)
++        request = self.factory.get(reverse('admin:admin_inlines_poll_add'))
++        request.user = User(username='super', is_superuser=True)
++        
++        # get_inlines should return only TitleInline on add page
++        inlines = modeladmin.get_inlines(request, obj=None)
++        self.assertEqual(len(inlines), 1)
++        self.assertEqual(inlines[0], TitleInline)
++        
++        # get_inline_instances should instantiate the returned inlines
++        inline_instances = modeladmin.get_inline_instances(request, obj=None)
++        self.assertEqual(len(inline_instances), 1)
++        self.assertIsInstance(inline_instances[0], TitleInline)
++
++        # Test on change page (obj is not None)
++        poll = Poll.objects.create(question='Test Poll')
++        request = self.factory.get(reverse('admin:admin_inlines_poll_change', args=(poll.id,)))
++        request.user = User(username='super', is_superuser=True)
++        
++        # get_inlines should return both inlines on change page
++        inlines = modeladmin.get_inlines(request, obj=poll)
++        self.assertEqual(len(inlines), 2)
++        self.assertEqual(inlines[0], TitleInline)
++        self.assertEqual(inlines[1], QuestionInline)
++        
++        # get_inline_instances should instantiate both inlines
++        inline_instances = modeladmin.get_inline_instances(request, obj=poll)
++        self.assertEqual(len(inline_instances), 2)
++        self.assertIsInstance(inline_instances[0], TitleInline)
++        self.assertIsInstance(inline_instances[1], QuestionInline)
++
+     def test_inline_nonauto_noneditable_pk(self):
+         response = self.client.get(reverse('admin:admin_inlines_author_add'))
+         self.assertContains(

@@ -370,6 +370,57 @@ class TestInline(TestDataMixin, TestCase):
         self.assertInHTML(min_forms % 5, response.rendered_content)
         self.assertInHTML(total_forms % 8, response.rendered_content)
 
+    def test_get_inlines_hook(self):
+        """
+        Test that get_inlines() hook allows dynamic selection of inlines
+        based on request or model instance.
+        """
+        from .admin import TitleInline, QuestionInline
+
+        class DynamicInlinesAdmin(ModelAdmin):
+            """Admin that uses get_inlines() to conditionally select inlines."""
+            
+            def get_inlines(self, request, obj=None):
+                # Return different inlines based on whether we're adding or changing
+                if obj is None:
+                    # On add page, return only TitleInline
+                    return [TitleInline]
+                else:
+                    # On change page, return both inlines
+                    return [TitleInline, QuestionInline]
+
+        # Test on add page (obj=None)
+        modeladmin = DynamicInlinesAdmin(Poll, admin_site)
+        request = self.factory.get(reverse('admin:admin_inlines_poll_add'))
+        request.user = User(username='super', is_superuser=True)
+        
+        # get_inlines should return only TitleInline on add page
+        inlines = modeladmin.get_inlines(request, obj=None)
+        self.assertEqual(len(inlines), 1)
+        self.assertEqual(inlines[0], TitleInline)
+        
+        # get_inline_instances should instantiate the returned inlines
+        inline_instances = modeladmin.get_inline_instances(request, obj=None)
+        self.assertEqual(len(inline_instances), 1)
+        self.assertIsInstance(inline_instances[0], TitleInline)
+
+        # Test on change page (obj is not None)
+        poll = Poll.objects.create(question='Test Poll')
+        request = self.factory.get(reverse('admin:admin_inlines_poll_change', args=(poll.id,)))
+        request.user = User(username='super', is_superuser=True)
+        
+        # get_inlines should return both inlines on change page
+        inlines = modeladmin.get_inlines(request, obj=poll)
+        self.assertEqual(len(inlines), 2)
+        self.assertEqual(inlines[0], TitleInline)
+        self.assertEqual(inlines[1], QuestionInline)
+        
+        # get_inline_instances should instantiate both inlines
+        inline_instances = modeladmin.get_inline_instances(request, obj=poll)
+        self.assertEqual(len(inline_instances), 2)
+        self.assertIsInstance(inline_instances[0], TitleInline)
+        self.assertIsInstance(inline_instances[1], QuestionInline)
+
     def test_inline_nonauto_noneditable_pk(self):
         response = self.client.get(reverse('admin:admin_inlines_author_add'))
         self.assertContains(
