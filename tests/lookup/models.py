@@ -5,6 +5,7 @@ This demonstrates features of the database API.
 """
 
 from django.db import models
+from django.db.models import UniqueConstraint
 from django.db.models.lookups import IsNull
 
 
@@ -108,3 +109,24 @@ class Freebie(models.Model):
         to_fields=['id', 'product'],
         on_delete=models.CASCADE,
     )
+
+
+class ArticleWithConstraint(models.Model):
+    headline = models.CharField(max_length=100)
+    slug = models.SlugField(blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=['slug'], name='article_constraint_slug_unq')
+        ]
+
+
+class ArticleWithMultiFieldConstraint(models.Model):
+    headline = models.CharField(max_length=100)
+    slug = models.SlugField(blank=True, null=True)
+    author_name = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=['slug', 'author_name'], name='article_constraint_slug_author_unq')
+        ]

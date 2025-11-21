@@ -1,0 +1,103 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index d9c9b0db04..0b9d59763d 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -689,8 +689,17 @@ class QuerySet:
+         """
+         assert not self.query.is_sliced, \
+             "Cannot use 'limit' or 'offset' with in_bulk"
+-        if field_name != 'pk' and not self.model._meta.get_field(field_name).unique:
+-            raise ValueError("in_bulk()'s field_name must be a unique field but %r isn't." % field_name)
++        if field_name != 'pk':
++            field = self.model._meta.get_field(field_name)
++            # Check if field is unique via unique=True or via UniqueConstraint
++            if not field.unique:
++                # Check if field is the only field in a total unique constraint
++                is_unique_via_constraint = any(
++                    constraint.fields == (field_name,)
++                    for constraint in self.model._meta.total_unique_constraints
++                )
++                if not is_unique_via_constraint:
++                    raise ValueError("in_bulk()'s field_name must be a unique field but %r isn't." % field_name)
+         if id_list is not None:
+             if not id_list:
+                 return {}
+diff --git a/tests/lookup/models.py b/tests/lookup/models.py
+index fbc9fa606f..ea543475be 100644
+--- a/tests/lookup/models.py
++++ b/tests/lookup/models.py
+@@ -5,6 +5,7 @@ This demonstrates features of the database API.
+ """
+ 
+ from django.db import models
++from django.db.models import UniqueConstraint
+ from django.db.models.lookups import IsNull
+ 
+ 
+@@ -108,3 +109,24 @@ class Freebie(models.Model):
+         to_fields=['id', 'product'],
+         on_delete=models.CASCADE,
+     )
++
++
++class ArticleWithConstraint(models.Model):
++    headline = models.CharField(max_length=100)
++    slug = models.SlugField(blank=True, null=True)
++
++    class Meta:
++        constraints = [
++            UniqueConstraint(fields=['slug'], name='article_constraint_slug_unq')
++        ]
++
++
++class ArticleWithMultiFieldConstraint(models.Model):
++    headline = models.CharField(max_length=100)
++    slug = models.SlugField(blank=True, null=True)
++    author_name = models.CharField(max_length=100, blank=True, null=True)
++
++    class Meta:
++        constraints = [
++            UniqueConstraint(fields=['slug', 'author_name'], name='article_constraint_slug_author_unq')
++        ]
+diff --git a/tests/lookup/tests.py b/tests/lookup/tests.py
+index baefdf9701..69fc52500f 100644
+--- a/tests/lookup/tests.py
++++ b/tests/lookup/tests.py
+@@ -11,7 +11,7 @@ from django.test import TestCase, skipUnlessDBFeature
+ from django.utils.deprecation import RemovedInDjango40Warning
+ 
+ from .models import (
+-    Article, Author, Freebie, Game, IsNullWithNoneAsRHS, Player, Season, Tag,
++    Article, ArticleWithConstraint, ArticleWithMultiFieldConstraint, Author, Freebie, Game, IsNullWithNoneAsRHS, Player, Season, Tag,
+ )
+ 
+ 
+@@ -194,6 +194,28 @@ class LookupTests(TestCase):
+         with self.assertRaisesMessage(ValueError, msg):
+             Article.objects.in_bulk([self.au1], field_name='author')
+ 
++    def test_in_bulk_with_unique_constraint(self):
++        # Test that in_bulk() works with fields that have UniqueConstraint
++        a1 = ArticleWithConstraint.objects.create(headline='Article 1', slug='a1')
++        a2 = ArticleWithConstraint.objects.create(headline='Article 2', slug='a2')
++        a3 = ArticleWithConstraint.objects.create(headline='Article 3', slug='a3')
++        
++        result = ArticleWithConstraint.objects.in_bulk([a1.slug, a2.slug, a3.slug], field_name='slug')
++        self.assertEqual(
++            result,
++            {
++                a1.slug: a1,
++                a2.slug: a2,
++                a3.slug: a3,
++            }
++        )
++
++    def test_in_bulk_with_multi_field_unique_constraint(self):
++        # Test that in_bulk() rejects fields that are part of multi-field UniqueConstraints
++        msg = "in_bulk()'s field_name must be a unique field but 'slug' isn't."
++        with self.assertRaisesMessage(ValueError, msg):
++            ArticleWithMultiFieldConstraint.objects.in_bulk(['test'], field_name='slug')
++
+     def test_values(self):
+         # values() returns a list of dictionaries instead of object instances --
+         # and you can specify which fields you want to retrieve.

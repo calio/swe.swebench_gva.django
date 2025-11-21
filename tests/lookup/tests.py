@@ -11,7 +11,7 @@ from django.test import TestCase, skipUnlessDBFeature
 from django.utils.deprecation import RemovedInDjango40Warning
 
 from .models import (
-    Article, Author, Freebie, Game, IsNullWithNoneAsRHS, Player, Season, Tag,
+    Article, ArticleWithConstraint, ArticleWithMultiFieldConstraint, Author, Freebie, Game, IsNullWithNoneAsRHS, Player, Season, Tag,
 )
 
 
@@ -193,6 +193,28 @@ class LookupTests(TestCase):
         msg = "in_bulk()'s field_name must be a unique field but 'author' isn't."
         with self.assertRaisesMessage(ValueError, msg):
             Article.objects.in_bulk([self.au1], field_name='author')
+
+    def test_in_bulk_with_unique_constraint(self):
+        # Test that in_bulk() works with fields that have UniqueConstraint
+        a1 = ArticleWithConstraint.objects.create(headline='Article 1', slug='a1')
+        a2 = ArticleWithConstraint.objects.create(headline='Article 2', slug='a2')
+        a3 = ArticleWithConstraint.objects.create(headline='Article 3', slug='a3')
+        
+        result = ArticleWithConstraint.objects.in_bulk([a1.slug, a2.slug, a3.slug], field_name='slug')
+        self.assertEqual(
+            result,
+            {
+                a1.slug: a1,
+                a2.slug: a2,
+                a3.slug: a3,
+            }
+        )
+
+    def test_in_bulk_with_multi_field_unique_constraint(self):
+        # Test that in_bulk() rejects fields that are part of multi-field UniqueConstraints
+        msg = "in_bulk()'s field_name must be a unique field but 'slug' isn't."
+        with self.assertRaisesMessage(ValueError, msg):
+            ArticleWithMultiFieldConstraint.objects.in_bulk(['test'], field_name='slug')
 
     def test_values(self):
         # values() returns a list of dictionaries instead of object instances --
