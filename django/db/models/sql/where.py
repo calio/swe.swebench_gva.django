@@ -186,7 +186,10 @@ class WhereNode(tree.Node):
     @staticmethod
     def _resolve_leaf(expr, query, *args, **kwargs):
         if hasattr(expr, 'resolve_expression'):
-            expr = expr.resolve_expression(query, *args, **kwargs)
+            # OuterRef should not be resolved here as it's only valid in subqueries
+            from django.db.models.expressions import OuterRef
+            if not isinstance(expr, OuterRef):
+                expr = expr.resolve_expression(query, *args, **kwargs)
         return expr
 
     @classmethod

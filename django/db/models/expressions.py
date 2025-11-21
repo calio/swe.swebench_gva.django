@@ -569,6 +569,12 @@ class OuterRef(F):
             return self.name
         return ResolvedOuterRef(self.name)
 
+    def as_sql(self, compiler, connection):
+        # OuterRef should be converted to a reference to the outer query
+        # when used in a subquery context
+        # For now, just return the string representation
+        return '%s' % self, []
+
 
 class Func(SQLiteNumericMixin, Expression):
     """An SQL function call."""

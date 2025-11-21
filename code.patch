@@ -1,0 +1,59 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 2b59dd301a..0552376109 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -569,6 +569,12 @@ class OuterRef(F):
+             return self.name
+         return ResolvedOuterRef(self.name)
+ 
++    def as_sql(self, compiler, connection):
++        # OuterRef should be converted to a reference to the outer query
++        # when used in a subquery context
++        # For now, just return the string representation
++        return '%s' % self, []
++
+ 
+ class Func(SQLiteNumericMixin, Expression):
+     """An SQL function call."""
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 35f3c5e1ea..732991b716 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1047,6 +1047,9 @@ class Query(BaseExpression):
+ 
+     def resolve_lookup_value(self, value, can_reuse, allow_joins, simple_col):
+         if hasattr(value, 'resolve_expression'):
++            # OuterRef should not be resolved here as it's only valid in subqueries
++            if isinstance(value, OuterRef):
++                return value
+             kwargs = {'reuse': can_reuse, 'allow_joins': allow_joins}
+             if isinstance(value, F):
+                 kwargs['simple_col'] = simple_col
+@@ -1057,7 +1060,10 @@ class Query(BaseExpression):
+             resolved_values = []
+             for sub_value in value:
+                 if hasattr(sub_value, 'resolve_expression'):
+-                    if isinstance(sub_value, F):
++                    # OuterRef should not be resolved here as it's only valid in subqueries
++                    if isinstance(sub_value, OuterRef):
++                        resolved_values.append(sub_value)
++                    elif isinstance(sub_value, F):
+                         resolved_values.append(sub_value.resolve_expression(
+                             self, reuse=can_reuse, allow_joins=allow_joins,
+                             simple_col=simple_col,
+diff --git a/django/db/models/sql/where.py b/django/db/models/sql/where.py
+index bf0828dc8b..d5d4dae5a2 100644
+--- a/django/db/models/sql/where.py
++++ b/django/db/models/sql/where.py
+@@ -186,7 +186,10 @@ class WhereNode(tree.Node):
+     @staticmethod
+     def _resolve_leaf(expr, query, *args, **kwargs):
+         if hasattr(expr, 'resolve_expression'):
+-            expr = expr.resolve_expression(query, *args, **kwargs)
++            # OuterRef should not be resolved here as it's only valid in subqueries
++            from django.db.models.expressions import OuterRef
++            if not isinstance(expr, OuterRef):
++                expr = expr.resolve_expression(query, *args, **kwargs)
+         return expr
+ 
+     @classmethod

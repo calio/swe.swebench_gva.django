@@ -1047,6 +1047,9 @@ class Query(BaseExpression):
 
     def resolve_lookup_value(self, value, can_reuse, allow_joins, simple_col):
         if hasattr(value, 'resolve_expression'):
+            # OuterRef should not be resolved here as it's only valid in subqueries
+            if isinstance(value, OuterRef):
+                return value
             kwargs = {'reuse': can_reuse, 'allow_joins': allow_joins}
             if isinstance(value, F):
                 kwargs['simple_col'] = simple_col
@@ -1057,7 +1060,10 @@ class Query(BaseExpression):
             resolved_values = []
             for sub_value in value:
                 if hasattr(sub_value, 'resolve_expression'):
-                    if isinstance(sub_value, F):
+                    # OuterRef should not be resolved here as it's only valid in subqueries
+                    if isinstance(sub_value, OuterRef):
+                        resolved_values.append(sub_value)
+                    elif isinstance(sub_value, F):
                         resolved_values.append(sub_value.resolve_expression(
                             self, reuse=can_reuse, allow_joins=allow_joins,
                             simple_col=simple_col,
