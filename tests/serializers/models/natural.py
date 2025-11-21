@@ -73,3 +73,39 @@ class FKAsPKNoNaturalKey(models.Model):
 
     def natural_key(self):
         raise NotImplementedError("This method was not expected to be called.")
+
+
+class AuthorWithNaturalKeyManager(models.Manager):
+    def get_by_natural_key(self, name):
+        return self.get(name=name)
+
+
+class AuthorWithNaturalKey(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    objects = AuthorWithNaturalKeyManager()
+
+    def natural_key(self):
+        return (self.name,)
+
+
+class BookWithNaturalKeyManager(models.Manager):
+    def get_by_natural_key(self, title, author):
+        return self.get(title=title, author__name=author)
+
+
+class BookWithNaturalKey(models.Model):
+    title = models.CharField(max_length=255)
+    author = models.ForeignKey(
+        AuthorWithNaturalKey, models.DO_NOTHING, related_name="books"
+    )
+
+    objects = BookWithNaturalKeyManager()
+
+    def natural_key(self):
+        return (self.title,) + self.author.natural_key()
+
+    natural_key.dependencies = ["serializers.AuthorWithNaturalKey"]
+
+    class Meta:
+        unique_together = [["title", "author"]]

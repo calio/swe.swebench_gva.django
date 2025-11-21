@@ -3,6 +3,8 @@ from django.db import connection
 from django.test import TestCase
 
 from .models import (
+    AuthorWithNaturalKey,
+    BookWithNaturalKey,
     Child,
     FKAsPKNoNaturalKey,
     FKDataNaturalKey,
@@ -282,3 +284,48 @@ register_tests(
     "test_%s_fk_as_pk_natural_key_not_called",
     fk_as_pk_natural_key_not_called,
 )
+
+
+class NaturalKeyMultiDatabaseTests(TestCase):
+    databases = {"default", "other"}
+
+    def test_natural_key_with_fk_on_non_default_database(self):
+        """
+        Test that loaddata works with natural keys that reference foreign keys
+        on a non-default database. This is a regression test for #15525.
+        """
+        # Create author and book in the default database
+        author = AuthorWithNaturalKey.objects.create(name="JR Tolkien")
+        book = BookWithNaturalKey.objects.create(title="The Ring", author=author)
+
+        # Serialize with natural keys
+        serialized_data = serializers.serialize(
+            "json",
+            [author, book],
+            indent=2,
+            use_natural_foreign_keys=True,
+            use_natural_primary_keys=True,
+        )
+
+        # Delete from default database
+        book.delete()
+        author.delete()
+
+        # Deserialize to the "other" database
+        # This should not raise a DoesNotExist error
+        deserialized_objects = list(
+            serializers.deserialize("json", serialized_data, using="other")
+        )
+        self.assertEqual(len(deserialized_objects), 2)
+
+        # Save the deserialized objects
+        for obj in deserialized_objects:
+            obj.save(using="other")
+
+        # Verify the objects were saved to the "other" database
+        self.assertEqual(AuthorWithNaturalKey.objects.using("other").count(), 1)
+        self.assertEqual(BookWithNaturalKey.objects.using("other").count(), 1)
+
+        author_other = AuthorWithNaturalKey.objects.using("other").get(name="JR Tolkien")
+        book_other = BookWithNaturalKey.objects.using("other").get(title="The Ring")
+        self.assertEqual(book_other.author, author_other)
