@@ -94,7 +94,7 @@ class URLValidator(RegexValidator):
 
     regex = _lazy_re_compile(
         r'^(?:[a-z0-9\.\-\+]*)://'  # scheme is validated separately
-        r'(?:\S+(?::\S*)?@)?'  # user:pass authentication
+        r'(?:[a-z0-9\-._~%!$&\'()*+,;=]*(?::[a-z0-9\-._~%!$&\'()*+,;=]*)?@)?'  # user:pass authentication
         r'(?:' + ipv4_re + '|' + ipv6_re + '|' + host_re + ')'
         r'(?::\d{2,5})?'  # port
         r'(?:[/?#][^\s]*)?'  # resource path
@@ -128,6 +128,11 @@ class URLValidator(RegexValidator):
                 except UnicodeError:  # invalid domain part
                     raise e
                 url = urlunsplit((scheme, netloc, path, query, fragment))
+                # If the reconstructed URL is different from the original, it means
+                # the original URL had invalid characters (e.g., newlines) that were
+                # stripped by urlsplit/urlunsplit. Reject it.
+                if url != value:
+                    raise e
                 super().__call__(url)
             else:
                 raise

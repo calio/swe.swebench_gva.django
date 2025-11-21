@@ -1,0 +1,97 @@
+diff --git a/django/core/validators.py b/django/core/validators.py
+index 92394a7eae..f4838de753 100644
+--- a/django/core/validators.py
++++ b/django/core/validators.py
+@@ -94,7 +94,7 @@ class URLValidator(RegexValidator):
+ 
+     regex = _lazy_re_compile(
+         r'^(?:[a-z0-9\.\-\+]*)://'  # scheme is validated separately
+-        r'(?:\S+(?::\S*)?@)?'  # user:pass authentication
++        r'(?:[a-z0-9\-._~%!$&\'()*+,;=]*(?::[a-z0-9\-._~%!$&\'()*+,;=]*)?@)?'  # user:pass authentication
+         r'(?:' + ipv4_re + '|' + ipv6_re + '|' + host_re + ')'
+         r'(?::\d{2,5})?'  # port
+         r'(?:[/?#][^\s]*)?'  # resource path
+@@ -128,6 +128,11 @@ class URLValidator(RegexValidator):
+                 except UnicodeError:  # invalid domain part
+                     raise e
+                 url = urlunsplit((scheme, netloc, path, query, fragment))
++                # If the reconstructed URL is different from the original, it means
++                # the original URL had invalid characters (e.g., newlines) that were
++                # stripped by urlsplit/urlunsplit. Reject it.
++                if url != value:
++                    raise e
+                 super().__call__(url)
+             else:
+                 raise
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index c5145c40d8..437d8b529b 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -231,7 +231,7 @@ class Collector:
+         """
+         return related.related_model._base_manager.using(self.using).filter(
+             **{"%s__in" % related.field.name: objs}
+-        )
++        ).only(related.related_model._meta.pk.name)
+ 
+     def instances_with_model(self):
+         for model, instances in self.data.items():
+diff --git a/tests/aggregation/test_filter_argument.py b/tests/aggregation/test_filter_argument.py
+index 54836178c4..4187096f52 100644
+--- a/tests/aggregation/test_filter_argument.py
++++ b/tests/aggregation/test_filter_argument.py
+@@ -79,3 +79,28 @@ class FilteredAggregateTests(TestCase):
+         msg = 'Star cannot be used with filter. Please specify a field.'
+         with self.assertRaisesMessage(ValueError, msg):
+             Count('*', filter=Q(age=40))
++
++    def test_count_distinct_with_case(self):
++        """Test that Count with distinct=True and Case condition generates valid SQL."""
++        # This should not raise a syntax error
++        qs = Book.objects.annotate(
++            count_distinct=Count(
++                Case(When(rating__gt=4, then='id')),
++                distinct=True
++            )
++        )
++        # Try to execute the query to ensure the SQL is valid
++        list(qs)
++
++    def test_count_distinct_with_case_and_filter(self):
++        """Test that Count with distinct=True, Case condition, and filter generates valid SQL."""
++        # This should not raise a syntax error
++        qs = Book.objects.annotate(
++            count_distinct=Count(
++                Case(When(rating__gt=4, then='id')),
++                distinct=True,
++                filter=Q(pages__gt=400)
++            )
++        )
++        # Try to execute the query to ensure the SQL is valid
++        list(qs)
+diff --git a/tests/validators/invalid_urls.txt b/tests/validators/invalid_urls.txt
+index 04a0b5fb1b..b7796b3768 100644
+--- a/tests/validators/invalid_urls.txt
++++ b/tests/validators/invalid_urls.txt
+@@ -57,3 +57,8 @@ http://example.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
+ http://example.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ http://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaa
+ https://test.[com
++http://foo/bar@example.com
++http://foo:bar/baz@example.com
++http://foo@bar@example.com
++http://foo:bar@baz@example.com
++http://foo:bar:baz@example.com
+diff --git a/tests/validators/valid_urls.txt b/tests/validators/valid_urls.txt
+index 4bc8c03059..5a24ef530d 100644
+--- a/tests/validators/valid_urls.txt
++++ b/tests/validators/valid_urls.txt
+@@ -48,7 +48,7 @@ http://foo.bar/?q=Test%20URL-encoded%20stuff
+ http://مثال.إختبار
+ http://例子.测试
+ http://उदाहरण.परीक्षा
+-http://-.~_!$&'()*+,;=:%40:80%2f::::::@example.com
++http://-.~_!$&'()*+,;=%3A%40%2f%3A%3A%3A%3A%3A%3A@example.com
+ http://xn--7sbb4ac0ad0be6cf.xn--p1ai
+ http://1337.net
+ http://a.b-c.de

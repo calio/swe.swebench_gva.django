@@ -1,0 +1,5 @@
+2025-11-15 10:59:01,513 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-15 10:59:01,514 - gv_client_debug - DEBUG - Messages count: 2
+2025-11-15 10:59:01,514 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-15 10:59:04,318 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.80s
+2025-11-15 10:59:04,318 - gv_client_debug - INFO - Tokens - Input: 324, Output: 117, Cache Read: 15550, Cache Create: 0

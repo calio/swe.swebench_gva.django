@@ -79,3 +79,28 @@ class FilteredAggregateTests(TestCase):
         msg = 'Star cannot be used with filter. Please specify a field.'
         with self.assertRaisesMessage(ValueError, msg):
             Count('*', filter=Q(age=40))
+
+    def test_count_distinct_with_case(self):
+        """Test that Count with distinct=True and Case condition generates valid SQL."""
+        # This should not raise a syntax error
+        qs = Book.objects.annotate(
+            count_distinct=Count(
+                Case(When(rating__gt=4, then='id')),
+                distinct=True
+            )
+        )
+        # Try to execute the query to ensure the SQL is valid
+        list(qs)
+
+    def test_count_distinct_with_case_and_filter(self):
+        """Test that Count with distinct=True, Case condition, and filter generates valid SQL."""
+        # This should not raise a syntax error
+        qs = Book.objects.annotate(
+            count_distinct=Count(
+                Case(When(rating__gt=4, then='id')),
+                distinct=True,
+                filter=Q(pages__gt=400)
+            )
+        )
+        # Try to execute the query to ensure the SQL is valid
+        list(qs)
