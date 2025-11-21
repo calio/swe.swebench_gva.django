@@ -1130,3 +1130,18 @@ class TestSplitFormWidget(PostgreSQLWidgetTestCase):
         self.assertIs(widget.value_omitted_from_data({'field_0': 'value'}, {}, 'field'), False)
         self.assertIs(widget.value_omitted_from_data({'field_1': 'value'}, {}, 'field'), False)
         self.assertIs(widget.value_omitted_from_data({'field_0': 'value', 'field_1': 'value'}, {}, 'field'), False)
+
+    def test_split_array_widget_checkbox_with_mixed_values(self):
+        """
+        Test that SplitArrayWidget with BooleanField correctly handles mixed
+        True/False values. Regression test for #12193.
+        """
+        widget = SplitArrayWidget(forms.CheckboxInput(), size=4)
+        context = widget.get_context('test', [False, True, False, False], {'id': 'id_test'})
+        subwidgets = context['widget']['subwidgets']
+        
+        # Check that each subwidget has the correct 'checked' attribute
+        self.assertFalse(subwidgets[0]['attrs'].get('checked', False))
+        self.assertTrue(subwidgets[1]['attrs'].get('checked', False))
+        self.assertFalse(subwidgets[2]['attrs'].get('checked', False))
+        self.assertFalse(subwidgets[3]['attrs'].get('checked', False))

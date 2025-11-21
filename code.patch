@@ -1,0 +1,41 @@
+diff --git a/django/contrib/postgres/forms/array.py b/django/contrib/postgres/forms/array.py
+index 2e19cd574a..341f563e3b 100644
+--- a/django/contrib/postgres/forms/array.py
++++ b/django/contrib/postgres/forms/array.py
+@@ -145,9 +145,11 @@ class SplitArrayWidget(forms.Widget):
+             except IndexError:
+                 widget_value = None
+             if id_:
+-                final_attrs = {**final_attrs, 'id': '%s_%s' % (id_, i)}
++                widget_attrs = {**final_attrs, 'id': '%s_%s' % (id_, i)}
++            else:
++                widget_attrs = final_attrs.copy()
+             context['widget']['subwidgets'].append(
+-                self.widget.get_context(name + '_%s' % i, widget_value, final_attrs)['widget']
++                self.widget.get_context(name + '_%s' % i, widget_value, widget_attrs)['widget']
+             )
+         return context
+ 
+diff --git a/tests/postgres_tests/test_array.py b/tests/postgres_tests/test_array.py
+index 481d93f830..f7b19364b7 100644
+--- a/tests/postgres_tests/test_array.py
++++ b/tests/postgres_tests/test_array.py
+@@ -1130,3 +1130,18 @@ class TestSplitFormWidget(PostgreSQLWidgetTestCase):
+         self.assertIs(widget.value_omitted_from_data({'field_0': 'value'}, {}, 'field'), False)
+         self.assertIs(widget.value_omitted_from_data({'field_1': 'value'}, {}, 'field'), False)
+         self.assertIs(widget.value_omitted_from_data({'field_0': 'value', 'field_1': 'value'}, {}, 'field'), False)
++
++    def test_split_array_widget_checkbox_with_mixed_values(self):
++        """
++        Test that SplitArrayWidget with BooleanField correctly handles mixed
++        True/False values. Regression test for #12193.
++        """
++        widget = SplitArrayWidget(forms.CheckboxInput(), size=4)
++        context = widget.get_context('test', [False, True, False, False], {'id': 'id_test'})
++        subwidgets = context['widget']['subwidgets']
++        
++        # Check that each subwidget has the correct 'checked' attribute
++        self.assertFalse(subwidgets[0]['attrs'].get('checked', False))
++        self.assertTrue(subwidgets[1]['attrs'].get('checked', False))
++        self.assertFalse(subwidgets[2]['attrs'].get('checked', False))
++        self.assertFalse(subwidgets[3]['attrs'].get('checked', False))
