@@ -1827,6 +1827,34 @@ class AggregationTests(TestCase):
         )
         self.assertEqual(set(books), {self.b1, self.b4})
 
+    def test_count_with_unused_annotations(self):
+        """
+        Regression test for stripping unused annotations from count queries.
+        count() should not include annotations that are not referenced in
+        filters, ordering, or other annotations.
+        """
+        # Test that count() with unused annotation produces the same result
+        # as count() without annotation
+        count_without_annotation = Book.objects.count()
+        count_with_unused_annotation = Book.objects.annotate(
+            Count("store")
+        ).count()
+        self.assertEqual(count_without_annotation, count_with_unused_annotation)
+
+        # Test that count() with used annotation in filter still works
+        count_with_used_annotation = Book.objects.annotate(
+            num_authors=Count("authors")
+        ).filter(num_authors__gt=0).count()
+        # Should be 6 based on the test data setup
+        self.assertEqual(count_with_used_annotation, 6)
+
+        # Test that count() with used annotation in ordering still works
+        count_with_ordering = Book.objects.annotate(
+            num_authors=Count("authors")
+        ).order_by("-num_authors").count()
+        # Should be 6 based on the test data setup
+        self.assertEqual(count_with_ordering, 6)
+
 
 class JoinPromotionTests(TestCase):
     def test_ticket_21150(self):

@@ -545,12 +545,73 @@ class Query(BaseExpression):
 
         return dict(zip(outer_query.annotation_select, result))
 
+    def _get_used_annotations(self):
+        """
+        Return a set of annotation aliases that are actually used in the query
+        (i.e., referenced in filters, ordering, or other annotations).
+        """
+        used = set()
+        
+        # Check annotations referenced in WHERE clause
+        def check_node(node):
+            for child in node.children:
+                if isinstance(child, Node):
+                    check_node(child)
+                else:
+                    # child is a Lookup object
+                    if hasattr(child, 'lhs') and hasattr(child.lhs, 'name'):
+                        # Check if this references an annotation
+                        if child.lhs.name in self.annotations:
+                            used.add(child.lhs.name)
+        
+        check_node(self.where)
+        
+        # Check annotations referenced in ORDER BY
+        for order_expr in self.order_by:
+            if isinstance(order_expr, str):
+                # Remove the '-' prefix if present
+                col_name = order_expr.lstrip('-')
+                if col_name in self.annotations:
+                    used.add(col_name)
+            elif hasattr(order_expr, 'name') and order_expr.name in self.annotations:
+                used.add(order_expr.name)
+            elif isinstance(order_expr, Ref) and order_expr.refs in self.annotations:
+                used.add(order_expr.refs)
+        
+        # Check annotations referenced in other annotations
+        def check_annotation_expr(expr, checked=None):
+            if checked is None:
+                checked = set()
+            if isinstance(expr, Ref) and expr.refs in self.annotations:
+                if expr.refs not in checked:
+                    used.add(expr.refs)
+                    checked.add(expr.refs)
+                    check_annotation_expr(self.annotations[expr.refs], checked)
+            elif hasattr(expr, 'get_source_expressions'):
+                for source_expr in expr.get_source_expressions():
+                    check_annotation_expr(source_expr, checked)
+        
+        for annotation in self.annotations.values():
+            check_annotation_expr(annotation)
+        
+        return used
+
     def get_count(self, using):
         """
         Perform a COUNT() query using the current filter constraints.
         """
         obj = self.clone()
         obj.add_annotation(Count("*"), alias="__count", is_summary=True)
+        
+        # Strip out unused annotations to avoid unnecessary GROUP BY
+        used_annotations = obj._get_used_annotations()
+        # Always include the __count annotation
+        used_annotations.add("__count")
+        
+        # Set the annotation mask to only include used annotations
+        if used_annotations != set(obj.annotations.keys()):
+            obj.set_annotation_mask(used_annotations)
+        
         return obj.get_aggregation(using, ["__count"])["__count"]
 
     def has_filters(self):
