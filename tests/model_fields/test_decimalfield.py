@@ -25,6 +25,22 @@ class DecimalFieldTests(TestCase):
         with self.assertRaisesMessage(ValidationError, msg):
             f.to_python('abc')
 
+    def test_to_python_invalid_types(self):
+        """
+        to_python() raises ValidationError for invalid types like dict, list, etc.
+        """
+        f = models.DecimalField(max_digits=4, decimal_places=2)
+        msg = 'value must be a decimal number.'
+        # Test dict
+        with self.assertRaisesMessage(ValidationError, msg):
+            f.to_python({'a': 1})
+        # Test list
+        with self.assertRaisesMessage(ValidationError, msg):
+            f.to_python([1, 2])
+        # Test tuple
+        with self.assertRaisesMessage(ValidationError, msg):
+            f.to_python((1, 2))
+
     def test_default(self):
         f = models.DecimalField(default=Decimal('0.00'))
         self.assertEqual(f.get_default(), Decimal('0.00'))

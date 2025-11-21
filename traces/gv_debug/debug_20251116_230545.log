@@ -1,0 +1,364 @@
+2025-11-16 23:05:54,397 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:05:54,397 - gv_client_debug - DEBUG - Messages count: 3
+2025-11-16 23:05:54,397 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:05:56,600 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.20s
+2025-11-16 23:05:56,600 - gv_client_debug - INFO - Tokens - Input: 39, Output: 174, Cache Read: 13161, Cache Create: 2783
+2025-11-16 23:05:56,612 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:05:56,612 - gv_client_debug - DEBUG - Messages count: 3
+2025-11-16 23:05:56,612 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:05:59,492 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.88s
+2025-11-16 23:05:59,492 - gv_client_debug - INFO - Tokens - Input: 40, Output: 234, Cache Read: 12275, Cache Create: 432
+2025-11-16 23:05:59,638 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:05:59,638 - gv_client_debug - DEBUG - Messages count: 7
+2025-11-16 23:05:59,638 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:02,169 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.53s
+2025-11-16 23:06:02,169 - gv_client_debug - INFO - Tokens - Input: 50, Output: 205, Cache Read: 12707, Cache Create: 1845
+2025-11-16 23:06:02,320 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:02,320 - gv_client_debug - DEBUG - Messages count: 10
+2025-11-16 23:06:02,320 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:04,827 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.51s
+2025-11-16 23:06:04,827 - gv_client_debug - INFO - Tokens - Input: 53, Output: 129, Cache Read: 14552, Cache Create: 1721
+2025-11-16 23:06:04,835 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:04,836 - gv_client_debug - DEBUG - Messages count: 12
+2025-11-16 23:06:04,836 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:07,184 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.35s
+2025-11-16 23:06:07,184 - gv_client_debug - INFO - Tokens - Input: 159, Output: 118, Cache Read: 16273, Cache Create: 46
+2025-11-16 23:06:07,184 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:07,184 - gv_client_debug - DEBUG - Messages count: 14
+2025-11-16 23:06:07,184 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:09,769 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.58s
+2025-11-16 23:06:09,769 - gv_client_debug - INFO - Tokens - Input: 1366, Output: 118, Cache Read: 16319, Cache Create: 153
+2025-11-16 23:06:09,770 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:09,770 - gv_client_debug - DEBUG - Messages count: 16
+2025-11-16 23:06:09,770 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:13,226 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.46s
+2025-11-16 23:06:13,226 - gv_client_debug - INFO - Tokens - Input: 792, Output: 247, Cache Read: 16472, Cache Create: 1360
+2025-11-16 23:06:13,476 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:13,476 - gv_client_debug - DEBUG - Messages count: 19
+2025-11-16 23:06:13,476 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:15,786 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.31s
+2025-11-16 23:06:15,786 - gv_client_debug - INFO - Tokens - Input: 41, Output: 137, Cache Read: 17832, Cache Create: 1072
+2025-11-16 23:06:15,900 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:15,900 - gv_client_debug - DEBUG - Messages count: 21
+2025-11-16 23:06:15,900 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:18,527 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.63s
+2025-11-16 23:06:18,527 - gv_client_debug - INFO - Tokens - Input: 985, Output: 226, Cache Read: 18904, Cache Create: 34
+2025-11-16 23:06:18,653 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:18,653 - gv_client_debug - DEBUG - Messages count: 24
+2025-11-16 23:06:18,653 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:21,094 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.44s
+2025-11-16 23:06:21,094 - gv_client_debug - INFO - Tokens - Input: 534, Output: 125, Cache Read: 18938, Cache Create: 1815
+2025-11-16 23:06:21,123 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:21,123 - gv_client_debug - DEBUG - Messages count: 26
+2025-11-16 23:06:21,123 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:22,681 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 1.56s
+2025-11-16 23:06:22,681 - gv_client_debug - INFO - Tokens - Input: 296, Output: 104, Cache Read: 20753, Cache Create: 527
+2025-11-16 23:06:22,699 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:22,699 - gv_client_debug - DEBUG - Messages count: 28
+2025-11-16 23:06:22,699 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:26,025 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.33s
+2025-11-16 23:06:26,025 - gv_client_debug - INFO - Tokens - Input: 851, Output: 251, Cache Read: 21280, Cache Create: 290
+2025-11-16 23:06:26,572 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:26,572 - gv_client_debug - DEBUG - Messages count: 31
+2025-11-16 23:06:26,572 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:29,098 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.53s
+2025-11-16 23:06:29,098 - gv_client_debug - INFO - Tokens - Input: 1054, Output: 129, Cache Read: 21570, Cache Create: 1474
+2025-11-16 23:06:29,123 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:29,123 - gv_client_debug - DEBUG - Messages count: 33
+2025-11-16 23:06:29,123 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:32,065 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.94s
+2025-11-16 23:06:32,065 - gv_client_debug - INFO - Tokens - Input: 336, Output: 233, Cache Read: 23044, Cache Create: 1047
+2025-11-16 23:06:32,266 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:32,266 - gv_client_debug - DEBUG - Messages count: 36
+2025-11-16 23:06:32,266 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:35,959 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.69s
+2025-11-16 23:06:35,959 - gv_client_debug - INFO - Tokens - Input: 1287, Output: 207, Cache Read: 24091, Cache Create: 666
+2025-11-16 23:06:36,073 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:36,073 - gv_client_debug - DEBUG - Messages count: 39
+2025-11-16 23:06:36,073 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:38,827 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.75s
+2025-11-16 23:06:38,827 - gv_client_debug - INFO - Tokens - Input: 571, Output: 171, Cache Read: 24757, Cache Create: 1538
+2025-11-16 23:06:39,107 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:39,107 - gv_client_debug - DEBUG - Messages count: 41
+2025-11-16 23:06:39,107 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:42,107 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.00s
+2025-11-16 23:06:42,107 - gv_client_debug - INFO - Tokens - Input: 290, Output: 278, Cache Read: 26295, Cache Create: 564
+2025-11-16 23:06:42,376 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:42,376 - gv_client_debug - DEBUG - Messages count: 44
+2025-11-16 23:06:42,376 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:45,286 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.91s
+2025-11-16 23:06:45,286 - gv_client_debug - INFO - Tokens - Input: 226, Output: 156, Cache Read: 26859, Cache Create: 799
+2025-11-16 23:06:45,338 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:45,339 - gv_client_debug - DEBUG - Messages count: 46
+2025-11-16 23:06:45,339 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:47,822 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.48s
+2025-11-16 23:06:47,822 - gv_client_debug - INFO - Tokens - Input: 197, Output: 219, Cache Read: 27658, Cache Create: 219
+2025-11-16 23:06:47,823 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:47,823 - gv_client_debug - DEBUG - Messages count: 49
+2025-11-16 23:06:47,823 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:49,990 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.17s
+2025-11-16 23:06:49,990 - gv_client_debug - INFO - Tokens - Input: 702, Output: 118, Cache Read: 27877, Cache Create: 1038
+2025-11-16 23:06:49,991 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:49,991 - gv_client_debug - DEBUG - Messages count: 51
+2025-11-16 23:06:49,991 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:52,916 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.92s
+2025-11-16 23:06:52,916 - gv_client_debug - INFO - Tokens - Input: 497, Output: 174, Cache Read: 28915, Cache Create: 695
+2025-11-16 23:06:52,917 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:52,917 - gv_client_debug - DEBUG - Messages count: 53
+2025-11-16 23:06:52,917 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:55,415 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.50s
+2025-11-16 23:06:55,415 - gv_client_debug - INFO - Tokens - Input: 390, Output: 182, Cache Read: 29610, Cache Create: 491
+2025-11-16 23:06:55,841 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:55,841 - gv_client_debug - DEBUG - Messages count: 55
+2025-11-16 23:06:55,841 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:06:58,723 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.88s
+2025-11-16 23:06:58,725 - gv_client_debug - INFO - Tokens - Input: 766, Output: 126, Cache Read: 30101, Cache Create: 384
+2025-11-16 23:06:58,747 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:06:58,747 - gv_client_debug - DEBUG - Messages count: 57
+2025-11-16 23:06:58,747 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:01,042 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.29s
+2025-11-16 23:07:01,042 - gv_client_debug - INFO - Tokens - Input: 873, Output: 129, Cache Read: 30485, Cache Create: 760
+2025-11-16 23:07:01,068 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:01,068 - gv_client_debug - DEBUG - Messages count: 59
+2025-11-16 23:07:01,068 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:03,769 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.70s
+2025-11-16 23:07:03,769 - gv_client_debug - INFO - Tokens - Input: 678, Output: 166, Cache Read: 31245, Cache Create: 867
+2025-11-16 23:07:03,804 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:03,804 - gv_client_debug - DEBUG - Messages count: 61
+2025-11-16 23:07:03,804 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:07,705 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.90s
+2025-11-16 23:07:07,705 - gv_client_debug - INFO - Tokens - Input: 194, Output: 239, Cache Read: 32112, Cache Create: 672
+2025-11-16 23:07:08,042 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:08,042 - gv_client_debug - DEBUG - Messages count: 64
+2025-11-16 23:07:08,043 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:10,318 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.27s
+2025-11-16 23:07:10,318 - gv_client_debug - INFO - Tokens - Input: 34, Output: 148, Cache Read: 32784, Cache Create: 530
+2025-11-16 23:07:19,054 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:19,054 - gv_client_debug - DEBUG - Messages count: 66
+2025-11-16 23:07:19,054 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:22,142 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.09s
+2025-11-16 23:07:22,142 - gv_client_debug - INFO - Tokens - Input: 170, Output: 164, Cache Read: 33314, Cache Create: 27
+2025-11-16 23:07:22,495 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:22,495 - gv_client_debug - DEBUG - Messages count: 68
+2025-11-16 23:07:22,495 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:37,167 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 14.67s
+2025-11-16 23:07:37,168 - gv_client_debug - INFO - Tokens - Input: 716, Output: 146, Cache Read: 33341, Cache Create: 164
+2025-11-16 23:07:37,204 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:37,204 - gv_client_debug - DEBUG - Messages count: 70
+2025-11-16 23:07:37,204 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:39,957 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.75s
+2025-11-16 23:07:39,957 - gv_client_debug - INFO - Tokens - Input: 713, Output: 121, Cache Read: 33505, Cache Create: 710
+2025-11-16 23:07:39,977 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:39,977 - gv_client_debug - DEBUG - Messages count: 72
+2025-11-16 23:07:39,977 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:41,861 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 1.88s
+2025-11-16 23:07:41,862 - gv_client_debug - INFO - Tokens - Input: 459, Output: 104, Cache Read: 34215, Cache Create: 707
+2025-11-16 23:07:41,882 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:41,882 - gv_client_debug - DEBUG - Messages count: 74
+2025-11-16 23:07:41,882 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:45,180 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.30s
+2025-11-16 23:07:45,181 - gv_client_debug - INFO - Tokens - Input: 2292, Output: 192, Cache Read: 34922, Cache Create: 453
+2025-11-16 23:07:45,408 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:45,408 - gv_client_debug - DEBUG - Messages count: 76
+2025-11-16 23:07:45,408 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:50,199 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 4.79s
+2025-11-16 23:07:50,199 - gv_client_debug - INFO - Tokens - Input: 267, Output: 151, Cache Read: 35375, Cache Create: 2286
+2025-11-16 23:07:50,207 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:50,207 - gv_client_debug - DEBUG - Messages count: 78
+2025-11-16 23:07:50,207 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:52,799 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.59s
+2025-11-16 23:07:52,799 - gv_client_debug - INFO - Tokens - Input: 182, Output: 169, Cache Read: 37661, Cache Create: 261
+2025-11-16 23:07:52,855 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:52,855 - gv_client_debug - DEBUG - Messages count: 80
+2025-11-16 23:07:52,855 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:55,932 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.08s
+2025-11-16 23:07:55,932 - gv_client_debug - INFO - Tokens - Input: 259, Output: 116, Cache Read: 37922, Cache Create: 176
+2025-11-16 23:07:55,952 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:55,952 - gv_client_debug - DEBUG - Messages count: 82
+2025-11-16 23:07:55,952 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:07:58,535 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.58s
+2025-11-16 23:07:58,535 - gv_client_debug - INFO - Tokens - Input: 159, Output: 133, Cache Read: 38098, Cache Create: 253
+2025-11-16 23:07:58,726 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:07:58,726 - gv_client_debug - DEBUG - Messages count: 84
+2025-11-16 23:07:58,726 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:08:03,622 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 4.89s
+2025-11-16 23:08:03,622 - gv_client_debug - INFO - Tokens - Input: 371, Output: 397, Cache Read: 38351, Cache Create: 153
+2025-11-16 23:08:03,807 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:03,807 - gv_client_debug - DEBUG - Messages count: 86
+2025-11-16 23:08:03,807 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:08:07,811 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 4.00s
+2025-11-16 23:08:07,811 - gv_client_debug - INFO - Tokens - Input: 1132, Output: 428, Cache Read: 38504, Cache Create: 365
+2025-11-16 23:08:07,834 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:07,835 - gv_client_debug - DEBUG - Messages count: 88
+2025-11-16 23:08:07,835 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:08:10,167 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.33s
+2025-11-16 23:08:10,167 - gv_client_debug - INFO - Tokens - Input: 488, Output: 109, Cache Read: 38869, Cache Create: 1126
+2025-11-16 23:08:10,179 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:10,179 - gv_client_debug - DEBUG - Messages count: 90
+2025-11-16 23:08:10,179 - gv_client_debug - DEBUG - Tools count: 17
+2025-11-16 23:08:21,330 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 11.15s
+2025-11-16 23:08:21,330 - gv_client_debug - INFO - Tokens - Input: 711, Output: 1123, Cache Read: 39995, Cache Create: 482
+2025-11-16 23:08:22,822 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:22,822 - gv_client_debug - DEBUG - Messages count: 1
+2025-11-16 23:08:26,725 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.90s
+2025-11-16 23:08:26,725 - gv_client_debug - INFO - Tokens - Input: 2251, Output: 307, Cache Read: 0, Cache Create: 0
+2025-11-16 23:08:26,727 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:26,727 - gv_client_debug - DEBUG - Messages count: 6
+2025-11-16 23:08:26,727 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:30,339 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.61s
+2025-11-16 23:08:30,339 - gv_client_debug - INFO - Tokens - Input: 60, Output: 248, Cache Read: 15944, Cache Create: 1367
+2025-11-16 23:08:30,344 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:30,344 - gv_client_debug - DEBUG - Messages count: 8
+2025-11-16 23:08:30,344 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:32,839 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.49s
+2025-11-16 23:08:32,839 - gv_client_debug - INFO - Tokens - Input: 312, Output: 135, Cache Read: 17311, Cache Create: 54
+2025-11-16 23:08:32,844 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:32,844 - gv_client_debug - DEBUG - Messages count: 11
+2025-11-16 23:08:32,844 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:34,371 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 1.53s
+2025-11-16 23:08:34,371 - gv_client_debug - INFO - Tokens - Input: 80, Output: 100, Cache Read: 17365, Cache Create: 746
+2025-11-16 23:08:34,375 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:34,375 - gv_client_debug - DEBUG - Messages count: 13
+2025-11-16 23:08:34,375 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:36,988 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.61s
+2025-11-16 23:08:36,988 - gv_client_debug - INFO - Tokens - Input: 1550, Output: 238, Cache Read: 18111, Cache Create: 79
+2025-11-16 23:08:36,994 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:36,994 - gv_client_debug - DEBUG - Messages count: 16
+2025-11-16 23:08:36,994 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:40,380 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.39s
+2025-11-16 23:08:40,380 - gv_client_debug - INFO - Tokens - Input: 213, Output: 415, Cache Read: 18190, Cache Create: 2004
+2025-11-16 23:08:40,383 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:40,383 - gv_client_debug - DEBUG - Messages count: 18
+2025-11-16 23:08:40,383 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:43,242 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.86s
+2025-11-16 23:08:43,242 - gv_client_debug - INFO - Tokens - Input: 446, Output: 194, Cache Read: 20194, Cache Create: 208
+2025-11-16 23:08:43,246 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:43,246 - gv_client_debug - DEBUG - Messages count: 20
+2025-11-16 23:08:43,246 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:48,600 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 5.35s
+2025-11-16 23:08:48,600 - gv_client_debug - INFO - Tokens - Input: 302, Output: 806, Cache Read: 20402, Cache Create: 442
+2025-11-16 23:08:48,605 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:48,605 - gv_client_debug - DEBUG - Messages count: 22
+2025-11-16 23:08:48,605 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:51,357 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.75s
+2025-11-16 23:08:51,357 - gv_client_debug - INFO - Tokens - Input: 830, Output: 132, Cache Read: 20844, Cache Create: 298
+2025-11-16 23:08:51,360 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:51,360 - gv_client_debug - DEBUG - Messages count: 24
+2025-11-16 23:08:51,360 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:54,097 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.74s
+2025-11-16 23:08:54,097 - gv_client_debug - INFO - Tokens - Input: 461, Output: 412, Cache Read: 21142, Cache Create: 826
+2025-11-16 23:08:54,100 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:54,100 - gv_client_debug - DEBUG - Messages count: 26
+2025-11-16 23:08:54,100 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:56,102 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.00s
+2025-11-16 23:08:56,102 - gv_client_debug - INFO - Tokens - Input: 436, Output: 129, Cache Read: 21968, Cache Create: 457
+2025-11-16 23:08:56,114 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:56,114 - gv_client_debug - DEBUG - Messages count: 28
+2025-11-16 23:08:56,114 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:08:57,884 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 1.77s
+2025-11-16 23:08:57,884 - gv_client_debug - INFO - Tokens - Input: 171, Output: 132, Cache Read: 22425, Cache Create: 432
+2025-11-16 23:08:57,895 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:08:57,895 - gv_client_debug - DEBUG - Messages count: 30
+2025-11-16 23:08:57,895 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:00,956 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.06s
+2025-11-16 23:09:00,957 - gv_client_debug - INFO - Tokens - Input: 489, Output: 415, Cache Read: 22857, Cache Create: 167
+2025-11-16 23:09:00,960 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:00,960 - gv_client_debug - DEBUG - Messages count: 32
+2025-11-16 23:09:00,960 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:03,272 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.31s
+2025-11-16 23:09:03,272 - gv_client_debug - INFO - Tokens - Input: 439, Output: 177, Cache Read: 23024, Cache Create: 485
+2025-11-16 23:09:03,296 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:03,296 - gv_client_debug - DEBUG - Messages count: 34
+2025-11-16 23:09:03,296 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:06,076 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.78s
+2025-11-16 23:09:06,076 - gv_client_debug - INFO - Tokens - Input: 272, Output: 413, Cache Read: 23509, Cache Create: 435
+2025-11-16 23:09:06,078 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:06,078 - gv_client_debug - DEBUG - Messages count: 36
+2025-11-16 23:09:06,078 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:09,553 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.47s
+2025-11-16 23:09:09,553 - gv_client_debug - INFO - Tokens - Input: 437, Output: 453, Cache Read: 23944, Cache Create: 268
+2025-11-16 23:09:09,579 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:09,579 - gv_client_debug - DEBUG - Messages count: 38
+2025-11-16 23:09:09,579 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:12,956 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.38s
+2025-11-16 23:09:12,956 - gv_client_debug - INFO - Tokens - Input: 473, Output: 196, Cache Read: 24212, Cache Create: 433
+2025-11-16 23:09:12,962 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:12,962 - gv_client_debug - DEBUG - Messages count: 40
+2025-11-16 23:09:12,962 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:14,976 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.01s
+2025-11-16 23:09:14,976 - gv_client_debug - INFO - Tokens - Input: 304, Output: 151, Cache Read: 24645, Cache Create: 469
+2025-11-16 23:09:15,498 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:15,498 - gv_client_debug - DEBUG - Messages count: 42
+2025-11-16 23:09:15,498 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:18,967 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.47s
+2025-11-16 23:09:18,967 - gv_client_debug - INFO - Tokens - Input: 1725, Output: 379, Cache Read: 25114, Cache Create: 300
+2025-11-16 23:09:18,973 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:18,973 - gv_client_debug - DEBUG - Messages count: 44
+2025-11-16 23:09:18,973 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:21,526 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.55s
+2025-11-16 23:09:21,526 - gv_client_debug - INFO - Tokens - Input: 409, Output: 145, Cache Read: 25414, Cache Create: 1721
+2025-11-16 23:09:21,853 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:21,854 - gv_client_debug - DEBUG - Messages count: 46
+2025-11-16 23:09:21,854 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:26,809 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 4.95s
+2025-11-16 23:09:26,809 - gv_client_debug - INFO - Tokens - Input: 1513, Output: 681, Cache Read: 27135, Cache Create: 405
+2025-11-16 23:09:26,955 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:26,955 - gv_client_debug - DEBUG - Messages count: 48
+2025-11-16 23:09:26,955 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:32,173 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 5.22s
+2025-11-16 23:09:32,173 - gv_client_debug - INFO - Tokens - Input: 1249, Output: 675, Cache Read: 27540, Cache Create: 1509
+2025-11-16 23:09:32,325 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:32,325 - gv_client_debug - DEBUG - Messages count: 50
+2025-11-16 23:09:32,325 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:34,308 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 1.98s
+2025-11-16 23:09:34,308 - gv_client_debug - INFO - Tokens - Input: 1087, Output: 114, Cache Read: 29049, Cache Create: 1245
+2025-11-16 23:09:34,397 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:34,397 - gv_client_debug - DEBUG - Messages count: 52
+2025-11-16 23:09:34,397 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:36,749 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.35s
+2025-11-16 23:09:36,749 - gv_client_debug - INFO - Tokens - Input: 302, Output: 137, Cache Read: 30294, Cache Create: 1083
+2025-11-16 23:09:36,754 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:36,754 - gv_client_debug - DEBUG - Messages count: 55
+2025-11-16 23:09:36,754 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:38,932 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.18s
+2025-11-16 23:09:38,932 - gv_client_debug - INFO - Tokens - Input: 80, Output: 130, Cache Read: 31377, Cache Create: 650
+2025-11-16 23:09:38,937 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:38,937 - gv_client_debug - DEBUG - Messages count: 57
+2025-11-16 23:09:38,937 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:41,389 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.45s
+2025-11-16 23:09:41,389 - gv_client_debug - INFO - Tokens - Input: 510, Output: 157, Cache Read: 32027, Cache Create: 79
+2025-11-16 23:09:41,699 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:41,699 - gv_client_debug - DEBUG - Messages count: 59
+2025-11-16 23:09:41,699 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:44,077 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.38s
+2025-11-16 23:09:44,077 - gv_client_debug - INFO - Tokens - Input: 427, Output: 147, Cache Read: 32106, Cache Create: 506
+2025-11-16 23:09:44,390 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:44,390 - gv_client_debug - DEBUG - Messages count: 61
+2025-11-16 23:09:44,390 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:46,318 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 1.93s
+2025-11-16 23:09:46,318 - gv_client_debug - INFO - Tokens - Input: 236, Output: 155, Cache Read: 32612, Cache Create: 423
+2025-11-16 23:09:46,329 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:46,329 - gv_client_debug - DEBUG - Messages count: 63
+2025-11-16 23:09:46,329 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:50,750 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 4.42s
+2025-11-16 23:09:50,750 - gv_client_debug - INFO - Tokens - Input: 309, Output: 671, Cache Read: 33035, Cache Create: 232
+2025-11-16 23:09:50,776 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:50,776 - gv_client_debug - DEBUG - Messages count: 65
+2025-11-16 23:09:50,776 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:53,101 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 2.32s
+2025-11-16 23:09:53,102 - gv_client_debug - INFO - Tokens - Input: 690, Output: 145, Cache Read: 33267, Cache Create: 305
+2025-11-16 23:09:53,115 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:53,115 - gv_client_debug - DEBUG - Messages count: 67
+2025-11-16 23:09:53,115 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:56,134 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.02s
+2025-11-16 23:09:56,134 - gv_client_debug - INFO - Tokens - Input: 171, Output: 289, Cache Read: 33572, Cache Create: 686
+2025-11-16 23:09:56,159 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:56,159 - gv_client_debug - DEBUG - Messages count: 69
+2025-11-16 23:09:56,159 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:09:59,837 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 3.68s
+2025-11-16 23:09:59,837 - gv_client_debug - INFO - Tokens - Input: 961, Output: 289, Cache Read: 34258, Cache Create: 167
+2025-11-16 23:09:59,840 - gv_client_debug - INFO - REQUEST [claude]: claude-haiku-4-5-20251001
+2025-11-16 23:09:59,841 - gv_client_debug - DEBUG - Messages count: 71
+2025-11-16 23:09:59,841 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-16 23:10:05,144 - gv_client_debug - INFO - RESPONSE [SUCCESS]: 5.30s
+2025-11-16 23:10:05,144 - gv_client_debug - INFO - Tokens - Input: 395, Output: 416, Cache Read: 34425, Cache Create: 957
