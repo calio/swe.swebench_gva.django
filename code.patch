@@ -1,0 +1,74 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 2428218696..f3648c4ad8 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -933,7 +933,7 @@ class Model(metaclass=ModelBase):
+                         "%s() prohibited to prevent data loss due to unsaved "
+                         "related object '%s'." % (operation_name, field.name)
+                     )
+-                elif getattr(self, field.attname) is None:
++                elif not getattr(self, field.attname):
+                     # Use pk from related object if it has been saved after
+                     # an assignment.
+                     setattr(self, field.attname, obj.pk)
+diff --git a/tests/model_fields/test_foreignkey.py b/tests/model_fields/test_foreignkey.py
+index d30cca9b5c..ad8c9250c9 100644
+--- a/tests/model_fields/test_foreignkey.py
++++ b/tests/model_fields/test_foreignkey.py
+@@ -3,7 +3,7 @@ from decimal import Decimal
+ from django.apps import apps
+ from django.core import checks
+ from django.core.exceptions import FieldError
+-from django.db import models
++from django.db import models, transaction
+ from django.test import TestCase, skipIfDBFeature
+ from django.test.utils import isolate_apps
+ 
+@@ -147,3 +147,47 @@ class ForeignKeyTests(TestCase):
+         )
+         with self.assertRaisesMessage(FieldError, msg):
+             Related._meta.get_field('child').related_fields
++
++    @skipIfDBFeature('interprets_empty_strings_as_nulls')
++    def test_fk_to_char_pk_assignment_after_parent_assignment(self):
++        """
++        Assigning a FK to a model with a CharField primary key, then setting
++        the primary key after assignment to the parent, should properly update
++        the parent's foreign key field.
++        """
++        with transaction.atomic():
++            fk_model = FkToChar()
++            char_model = PrimaryKeyCharModel()
++            fk_model.out = char_model
++            char_model.string = 'test_value'
++            char_model.save()
++            fk_model.save()
++            # The foreign key should be set to the actual primary key value
++            self.assertEqual(fk_model.out_id, 'test_value')
++            # Should be able to find the record by the foreign key
++            self.assertTrue(FkToChar.objects.filter(out=char_model).exists())
++            self.assertTrue(FkToChar.objects.filter(out_id='test_value').exists())
++
++    @skipIfDBFeature('interprets_empty_strings_as_nulls')
++    def test_fk_to_char_pk_assignment_with_empty_string(self):
++        """
++        Assigning a FK to a model with a CharField primary key that has an
++        empty string as the initial value, then setting the primary key after
++        assignment to the parent, should properly update the parent's foreign
++        key field.
++        """
++        with transaction.atomic():
++            fk_model = FkToChar()
++            char_model = PrimaryKeyCharModel()
++            fk_model.out = char_model
++            # Initially, the foreign key field should be an empty string
++            self.assertEqual(fk_model.out_id, '')
++            char_model.string = 'foo'
++            char_model.save()
++            fk_model.save()
++            # After saving, the foreign key should be updated to the actual value
++            self.assertEqual(fk_model.out_id, 'foo')
++            # Verify the record can be retrieved
++            retrieved = FkToChar.objects.get(pk=fk_model.pk)
++            self.assertEqual(retrieved.out_id, 'foo')
++            self.assertEqual(retrieved.out.string, 'foo')
