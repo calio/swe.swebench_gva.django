@@ -132,6 +132,16 @@ class NullableFields(models.Model):
     uuid_field = models.UUIDField(null=True, default=uuid.uuid4)
 
 
+class UpsertConflictDbColumn(models.Model):
+    """Model with db_column to test bulk_create with update_conflicts."""
+    number = models.IntegerField(unique=True, db_column="Number")
+    rank = models.IntegerField(db_column="Rank")
+    name = models.CharField(max_length=15, db_column="Name")
+
+    class Meta:
+        db_table = "bulk_create_upsertconflictdbcolumn"
+
+
 class RelatedModel(models.Model):
     name = models.CharField(max_length=15, null=True)
     country = models.OneToOneField(Country, models.CASCADE, primary_key=True)

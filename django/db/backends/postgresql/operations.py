@@ -354,11 +354,13 @@ class DatabaseOperations(BaseDatabaseOperations):
             return "ON CONFLICT DO NOTHING"
         if on_conflict == OnConflict.UPDATE:
             return "ON CONFLICT(%s) DO UPDATE SET %s" % (
-                ", ".join(map(self.quote_name, unique_fields)),
+                ", ".join(
+                    map(self.quote_name, [f.column for f in unique_fields])
+                ),
                 ", ".join(
                     [
-                        f"{field} = EXCLUDED.{field}"
-                        for field in map(self.quote_name, update_fields)
+                        f"{self.quote_name(f.column)} = EXCLUDED.{self.quote_name(f.column)}"
+                        for f in update_fields
                     ]
                 ),
             )

@@ -772,3 +772,40 @@ class BulkCreateTests(TestCase):
     @skipIfDBFeature("supports_update_conflicts_with_target")
     def test_update_conflicts_no_unique_fields(self):
         self._test_update_conflicts([])
+
+    @skipUnlessDBFeature(
+        "supports_update_conflicts", "supports_update_conflicts_with_target"
+    )
+    def test_update_conflicts_with_db_column(self):
+        """Test bulk_create with update_conflicts on fields with db_column."""
+        from .models import UpsertConflictDbColumn
+
+        UpsertConflictDbColumn.objects.bulk_create(
+            [
+                UpsertConflictDbColumn(number=1, rank=1, name="John"),
+                UpsertConflictDbColumn(number=2, rank=2, name="Mary"),
+                UpsertConflictDbColumn(number=3, rank=3, name="Hannah"),
+            ]
+        )
+        self.assertEqual(UpsertConflictDbColumn.objects.count(), 3)
+
+        conflicting_objects = [
+            UpsertConflictDbColumn(number=1, rank=4, name="Steve"),
+            UpsertConflictDbColumn(number=2, rank=2, name="Olivia"),
+            UpsertConflictDbColumn(number=3, rank=1, name="Hannah"),
+        ]
+        UpsertConflictDbColumn.objects.bulk_create(
+            conflicting_objects,
+            update_conflicts=True,
+            update_fields=["name", "rank"],
+            unique_fields=["number"],
+        )
+        self.assertEqual(UpsertConflictDbColumn.objects.count(), 3)
+        self.assertCountEqual(
+            UpsertConflictDbColumn.objects.values("number", "rank", "name"),
+            [
+                {"number": 1, "rank": 4, "name": "Steve"},
+                {"number": 2, "rank": 2, "name": "Olivia"},
+                {"number": 3, "rank": 1, "name": "Hannah"},
+            ],
+        )

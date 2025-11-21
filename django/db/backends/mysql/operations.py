@@ -452,7 +452,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             fields = ", ".join(
                 [
                     field_sql % {"field": field}
-                    for field in map(self.quote_name, update_fields)
+                    for field in map(self.quote_name, [f.column for f in update_fields])
                 ]
             )
             return conflict_suffix_sql % {"fields": fields}

@@ -698,7 +698,7 @@ class QuerySet(AltersData):
                 raise NotSupportedError(
                     "This database backend does not support ignoring conflicts."
                 )
-            return OnConflict.IGNORE
+            return OnConflict.IGNORE, update_fields, unique_fields
         elif update_conflicts:
             if not db_features.supports_update_conflicts:
                 raise NotSupportedError(
@@ -740,8 +740,8 @@ class QuerySet(AltersData):
                         "bulk_create() can only be used with concrete fields "
                         "in unique_fields."
                     )
-            return OnConflict.UPDATE
-        return None
+            return OnConflict.UPDATE, update_fields, unique_fields
+        return None, update_fields, unique_fields
 
     def bulk_create(
         self,
@@ -788,7 +788,7 @@ class QuerySet(AltersData):
             unique_fields = [
                 opts.pk.name if name == "pk" else name for name in unique_fields
             ]
-        on_conflict = self._check_bulk_create_options(
+        on_conflict, update_fields, unique_fields = self._check_bulk_create_options(
             ignore_conflicts,
             update_conflicts,
             update_fields,
