@@ -1,5 +1,7 @@
 from django.contrib import messages
-from django.test import RequestFactory, SimpleTestCase
+from django.contrib.messages import constants
+from django.contrib.messages.storage.base import Message
+from django.test import RequestFactory, SimpleTestCase, override_settings
 
 
 class DummyStorage:
@@ -64,3 +66,40 @@ class CustomRequestApiTests(ApiTests):
     def setUp(self):
         super().setUp()
         self.request = CustomRequest(self.request)
+
+
+class OverrideSettingsTagsTests(SimpleTestCase):
+    """
+    Test that MESSAGE_TAGS overrides work correctly with Message.level_tag
+    """
+
+    def test_level_tag_with_override_settings(self):
+        """
+        Test that level_tag property reflects MESSAGE_TAGS changes from @override_settings
+        """
+        # First, test default behavior
+        msg = Message(constants.INFO, 'Test message')
+        self.assertEqual(msg.level_tag, 'info')
+
+        # Now test with override_settings
+        with override_settings(MESSAGE_TAGS={constants.INFO: 'custom-info'}):
+            msg = Message(constants.INFO, 'Test message')
+            # This should be 'custom-info' but currently returns empty string (BUG)
+            self.assertEqual(msg.level_tag, 'custom-info')
+
+    def test_level_tag_with_multiple_overrides(self):
+        """
+        Test that level_tag works with multiple MESSAGE_TAGS overrides
+        """
+        with override_settings(MESSAGE_TAGS={
+            constants.INFO: 'info-custom',
+            constants.WARNING: 'warn-custom',
+            constants.ERROR: 'err-custom',
+        }):
+            info_msg = Message(constants.INFO, 'Info')
+            warning_msg = Message(constants.WARNING, 'Warning')
+            error_msg = Message(constants.ERROR, 'Error')
+
+            self.assertEqual(info_msg.level_tag, 'info-custom')
+            self.assertEqual(warning_msg.level_tag, 'warn-custom')
+            self.assertEqual(error_msg.level_tag, 'err-custom')

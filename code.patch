@@ -1,0 +1,102 @@
+diff --git a/django/contrib/messages/storage/base.py b/django/contrib/messages/storage/base.py
+index 01422066a6..8cdbbd92c7 100644
+--- a/django/contrib/messages/storage/base.py
++++ b/django/contrib/messages/storage/base.py
+@@ -1,8 +1,6 @@
+ from django.conf import settings
+ from django.contrib.messages import constants, utils
+ 
+-LEVEL_TAGS = utils.get_level_tags()
+-
+ 
+ class Message:
+     """
+@@ -38,7 +36,7 @@ class Message:
+ 
+     @property
+     def level_tag(self):
+-        return LEVEL_TAGS.get(self.level, '')
++        return utils.get_level_tags().get(self.level, '')
+ 
+ 
+ class BaseStorage:
+diff --git a/tests/messages_tests/base.py b/tests/messages_tests/base.py
+index 9dad08e6c7..0a1b5ded9c 100644
+--- a/tests/messages_tests/base.py
++++ b/tests/messages_tests/base.py
+@@ -23,17 +23,10 @@ def add_level_messages(storage):
+ 
+ 
+ class override_settings_tags(override_settings):
+-    def enable(self):
+-        super().enable()
+-        # LEVEL_TAGS is a constant defined in the
+-        # django.contrib.messages.storage.base module, so after changing
+-        # settings.MESSAGE_TAGS, update that constant also.
+-        self.old_level_tags = base.LEVEL_TAGS
+-        base.LEVEL_TAGS = utils.get_level_tags()
+-
+-    def disable(self):
+-        super().disable()
+-        base.LEVEL_TAGS = self.old_level_tags
++    # This class is now just an alias for override_settings since the
++    # Message.level_tag property is now dynamic and calls utils.get_level_tags()
++    # on each access, so it automatically reflects MESSAGE_TAGS changes.
++    pass
+ 
+ 
+ class BaseTests:
+diff --git a/tests/messages_tests/test_api.py b/tests/messages_tests/test_api.py
+index 603aea437f..1e9b52a246 100644
+--- a/tests/messages_tests/test_api.py
++++ b/tests/messages_tests/test_api.py
+@@ -1,5 +1,7 @@
+ from django.contrib import messages
+-from django.test import RequestFactory, SimpleTestCase
++from django.contrib.messages import constants
++from django.contrib.messages.storage.base import Message
++from django.test import RequestFactory, SimpleTestCase, override_settings
+ 
+ 
+ class DummyStorage:
+@@ -64,3 +66,40 @@ class CustomRequestApiTests(ApiTests):
+     def setUp(self):
+         super().setUp()
+         self.request = CustomRequest(self.request)
++
++
++class OverrideSettingsTagsTests(SimpleTestCase):
++    """
++    Test that MESSAGE_TAGS overrides work correctly with Message.level_tag
++    """
++
++    def test_level_tag_with_override_settings(self):
++        """
++        Test that level_tag property reflects MESSAGE_TAGS changes from @override_settings
++        """
++        # First, test default behavior
++        msg = Message(constants.INFO, 'Test message')
++        self.assertEqual(msg.level_tag, 'info')
++
++        # Now test with override_settings
++        with override_settings(MESSAGE_TAGS={constants.INFO: 'custom-info'}):
++            msg = Message(constants.INFO, 'Test message')
++            # This should be 'custom-info' but currently returns empty string (BUG)
++            self.assertEqual(msg.level_tag, 'custom-info')
++
++    def test_level_tag_with_multiple_overrides(self):
++        """
++        Test that level_tag works with multiple MESSAGE_TAGS overrides
++        """
++        with override_settings(MESSAGE_TAGS={
++            constants.INFO: 'info-custom',
++            constants.WARNING: 'warn-custom',
++            constants.ERROR: 'err-custom',
++        }):
++            info_msg = Message(constants.INFO, 'Info')
++            warning_msg = Message(constants.WARNING, 'Warning')
++            error_msg = Message(constants.ERROR, 'Error')
++
++            self.assertEqual(info_msg.level_tag, 'info-custom')
++            self.assertEqual(warning_msg.level_tag, 'warn-custom')
++            self.assertEqual(error_msg.level_tag, 'err-custom')
