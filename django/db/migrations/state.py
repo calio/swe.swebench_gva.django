@@ -91,8 +91,11 @@ class ProjectState:
     def __init__(self, models=None, real_apps=None):
         self.models = models or {}
         # Apps to include from main registry, usually unmigrated ones
-        if real_apps:
-            self.real_apps = real_apps if isinstance(real_apps, set) else set(real_apps)
+        if real_apps is not None:
+            assert isinstance(real_apps, set), (
+                "real_apps must be a set, not %s" % type(real_apps).__name__
+            )
+            self.real_apps = real_apps
         else:
             self.real_apps = set()
         self.is_delayed = False
