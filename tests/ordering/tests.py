@@ -462,6 +462,17 @@ class OrderingTests(TestCase):
             attrgetter('headline')
         )
 
+    def test_order_by_relation_with_f_expression_in_meta_ordering(self):
+        """
+        Ordering by a relation field on a model with F expressions in
+        Meta.ordering should not crash. This tests the fix for the issue
+        where find_ordering_name() would pass OrderBy expressions to
+        get_order_dir() which expects strings.
+        """
+        # This should not raise a TypeError
+        result = list(OrderedByFArticle.objects.order_by('author'))
+        self.assertEqual(len(result), 4)
+
     def test_deprecated_values_annotate(self):
         msg = (
             "Article QuerySet won't use Meta.ordering in Django 3.1. Add "

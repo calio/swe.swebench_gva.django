@@ -1,0 +1,45 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index eaccc96d7d..4c13535311 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -704,6 +704,18 @@ class SQLCompiler:
+         not be) and column name for ordering by the given 'name' parameter.
+         The 'name' is of the form 'field1__field2__...__fieldN'.
+         """
++        # Handle expressions (e.g., OrderBy, F expressions) that may be in Meta.ordering
++        if hasattr(name, 'resolve_expression'):
++            if isinstance(name, Value):
++                # output_field must be resolved for constants.
++                name = Cast(name, name.output_field)
++            if not isinstance(name, OrderBy):
++                name = name.asc()
++            if not self.query.standard_ordering:
++                name = name.copy()
++                name.reverse_ordering()
++            return [(name, False)]
++        
+         name, order = get_order_dir(name, default_order)
+         descending = order == 'DESC'
+         pieces = name.split(LOOKUP_SEP)
+diff --git a/tests/ordering/tests.py b/tests/ordering/tests.py
+index 18c32d6d5f..fb03c9e27f 100644
+--- a/tests/ordering/tests.py
++++ b/tests/ordering/tests.py
+@@ -462,6 +462,17 @@ class OrderingTests(TestCase):
+             attrgetter('headline')
+         )
+ 
++    def test_order_by_relation_with_f_expression_in_meta_ordering(self):
++        """
++        Ordering by a relation field on a model with F expressions in
++        Meta.ordering should not crash. This tests the fix for the issue
++        where find_ordering_name() would pass OrderBy expressions to
++        get_order_dir() which expects strings.
++        """
++        # This should not raise a TypeError
++        result = list(OrderedByFArticle.objects.order_by('author'))
++        self.assertEqual(len(result), 4)
++
+     def test_deprecated_values_annotate(self):
+         msg = (
+             "Article QuerySet won't use Meta.ordering in Django 3.1. Add "
