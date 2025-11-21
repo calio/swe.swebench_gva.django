@@ -77,6 +77,14 @@ class IntFlagEnum(enum.IntFlag):
     B = 2
 
 
+class NestedClassWithMethod:
+    """Test class for nested class method serialization."""
+    class NestedClass:
+        @classmethod
+        def default(cls):
+            return ["BASIC"]
+
+
 class OperationWriterTests(SimpleTestCase):
     def test_empty_signature(self):
         operation = custom_migration_operations.operations.TestOperation()
@@ -542,6 +550,20 @@ class WriterTests(SimpleTestCase):
         string, imports = MigrationWriter.serialize(models.SET(42))
         self.assertEqual(string, "models.SET(42)")
         self.serialize_round_trip(models.SET(42))
+
+    def test_serialize_nested_class_method(self):
+        """
+        Test that class methods from nested classes can be serialized correctly.
+        Regression test for issue where nested class methods were serialized with
+        incorrect paths (e.g., "appname.models.Capability.default" instead of
+        "appname.models.Profile.Capability.default").
+        """
+        string, imports = MigrationWriter.serialize(
+            NestedClassWithMethod.NestedClass.default
+        )
+        # The serialized path should include the parent class name
+        self.assertIn("NestedClassWithMethod.NestedClass.default", string)
+        self.serialize_round_trip(NestedClassWithMethod.NestedClass.default)
 
     def test_serialize_datetime(self):
         self.assertSerializedEqual(datetime.datetime.now())
