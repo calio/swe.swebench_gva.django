@@ -420,7 +420,12 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
 
         if isinstance(self.rhs, Query):
             self.rhs.clear_ordering(clear_default=True)
-            if not self.rhs.has_select_fields:
+            # Clear the select clause if the query doesn't have any explicitly
+            # selected fields (via values(), values_list(), or select()).
+            # Note: We check values_select instead of has_select_fields to avoid
+            # clearing the select clause when the query only has selected annotations
+            # (via annotate()) but no explicitly selected fields.
+            if not self.rhs.values_select and not self.rhs.has_select_fields:
                 self.rhs.clear_select_clause()
                 self.rhs.add_fields(["pk"])
         return super().get_prep_lookup()
