@@ -179,6 +179,21 @@ class DateFormatTests(SimpleTestCase):
                     expected_date,
                 )
 
+    def test_year_before_1000_four_digit(self):
+        tests = [
+            (476, '0476'),
+            (42, '0042'),
+            (4, '0004'),
+            (1, '0001'),
+            (999, '0999'),
+        ]
+        for year, expected_date in tests:
+            with self.subTest(year=year):
+                self.assertEqual(
+                    dateformat.format(datetime(year, 9, 8, 5, 0), 'Y'),
+                    expected_date,
+                )
+
     def test_twelve_hour_format(self):
         tests = [
             (0, '12'),

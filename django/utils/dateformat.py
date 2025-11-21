@@ -314,7 +314,7 @@ class DateFormat(TimeFormat):
 
     def Y(self):
         "Year, 4 digits; e.g. '1999'"
-        return self.data.year
+        return '%04d' % self.data.year
 
     def z(self):
         """Day of the year, i.e. 1 to 366."""
