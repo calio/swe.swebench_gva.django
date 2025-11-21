@@ -41,6 +41,9 @@ class Q(tree.Node):
 
     def _combine(self, other, conn):
         if not isinstance(other, Q):
+            # If other is a conditional expression, convert it to Q
+            if getattr(other, 'conditional', False):
+                return self._combine(Q(other), conn)
             raise TypeError(other)
 
         # If the other Q() is empty, ignore it and just use `self`.
@@ -87,7 +90,12 @@ class Q(tree.Node):
         args, kwargs = (), {}
         if len(self.children) == 1 and not isinstance(self.children[0], Q):
             child = self.children[0]
-            kwargs = {child[0]: child[1]}
+            # Check if child is a tuple (key, value) or a conditional expression
+            if isinstance(child, tuple):
+                kwargs = {child[0]: child[1]}
+            else:
+                # It's a conditional expression, add it as a positional argument
+                args = (child,)
         else:
             args = tuple(self.children)
             if self.connector != self.default:

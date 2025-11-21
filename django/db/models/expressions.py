@@ -137,11 +137,15 @@ class Combinable:
         return self._combine(other, self.POW, True)
 
     def __rand__(self, other):
+        if getattr(self, 'conditional', False) and getattr(other, 'conditional', False):
+            return Q(other) & Q(self)
         raise NotImplementedError(
             "Use .bitand() and .bitor() for bitwise logical operations."
         )
 
     def __ror__(self, other):
+        if getattr(self, 'conditional', False) and getattr(other, 'conditional', False):
+            return Q(other) | Q(self)
         raise NotImplementedError(
             "Use .bitand() and .bitor() for bitwise logical operations."
         )
