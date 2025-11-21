@@ -196,6 +196,97 @@ class SchemaTests(TransactionTestCase):
             with connection.schema_editor(atomic=True) as editor:
                 editor.alter_db_table(Author, "backends_author", "renamed_table")
 
+    def test_add_nullable_onetoone_field(self):
+        """
+        Test adding a nullable OneToOneField to an existing model.
+        This should not raise "Cannot add a UNIQUE column" error.
+        Regression test for issue where nullable OneToOneField crashes on SQLite.
+        """
+        from django.db import models
+        from django.db.models import OneToOneField, SET_NULL
+
+        # Create a test model with a OneToOneField
+        class TestRefModel(models.Model):
+            class Meta:
+                app_label = 'backends'
+
+        class TestModel(models.Model):
+            class Meta:
+                app_label = 'backends'
+
+        # Create the RefModel table
+        with connection.schema_editor() as editor:
+            editor.create_model(TestRefModel)
+
+        # Create the TestModel table without the field
+        with connection.schema_editor() as editor:
+            editor.create_model(TestModel)
+
+        # Now add a nullable OneToOneField - this should not raise an error
+        field = OneToOneField(
+            TestRefModel,
+            on_delete=SET_NULL,
+            null=True,
+            blank=True,
+            related_name='test_models'
+        )
+        field.set_attributes_from_name('ref')
+
+        # This should not raise "Cannot add a UNIQUE column" error
+        with connection.schema_editor() as editor:
+            editor.add_field(TestModel, field)
+
+    def test_add_nullable_unique_field(self):
+        """
+        Test adding a nullable unique field to an existing model.
+        This should not raise "Cannot add a UNIQUE column" error.
+        Regression test for issue where nullable unique fields crash on SQLite.
+        """
+        from django.db import models
+
+        # Create a test model
+        class TestModelUnique(models.Model):
+            class Meta:
+                app_label = 'backends'
+                db_table = 'test_model_unique'
+
+        # Create the TestModel table without the field
+        with connection.schema_editor() as editor:
+            editor.create_model(TestModelUnique)
+
+        # Now add a nullable unique field - this should not raise an error
+        field = models.CharField(max_length=100, null=True, unique=True)
+        field.set_attributes_from_name('unique_field')
+
+        # This should not raise "Cannot add a UNIQUE column" error
+        with connection.schema_editor() as editor:
+            editor.add_field(TestModelUnique, field)
+
+    def test_add_nullable_charfield_without_unique(self):
+        """
+        Test adding a nullable CharField without unique constraint.
+        This should use the optimized ALTER TABLE ADD COLUMN path.
+        """
+        from django.db import models
+
+        # Create a test model
+        class TestModelNoUnique(models.Model):
+            class Meta:
+                app_label = 'backends'
+                db_table = 'test_model_no_unique'
+
+        # Create the TestModel table without the field
+        with connection.schema_editor() as editor:
+            editor.create_model(TestModelNoUnique)
+
+        # Now add a nullable field without unique constraint
+        field = models.CharField(max_length=100, null=True)
+        field.set_attributes_from_name('nullable_field')
+
+        # This should use the optimized ALTER TABLE ADD COLUMN path
+        with connection.schema_editor() as editor:
+            editor.add_field(TestModelNoUnique, field)
+
 
 @unittest.skipUnless(connection.vendor == 'sqlite', 'Test only for SQLite')
 @override_settings(DEBUG=True)
