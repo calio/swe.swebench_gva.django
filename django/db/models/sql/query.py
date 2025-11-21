@@ -436,6 +436,14 @@ class Query(BaseExpression):
             )
             or having
         )
+        # Check if any aggregate references a window function annotation.
+        refs_window = any(
+            any(
+                getattr(self.annotations.get(ref), "contains_over_clause", False)
+                for ref in aggregate.get_refs()
+            )
+            for aggregate in aggregates.values()
+        )
         # Decide if we need to use a subquery.
         #
         # Existing aggregations would cause incorrect results as
@@ -451,6 +459,7 @@ class Query(BaseExpression):
             or self.is_sliced
             or has_existing_aggregation
             or refs_subquery
+            or refs_window
             or qualify
             or self.distinct
             or self.combinator

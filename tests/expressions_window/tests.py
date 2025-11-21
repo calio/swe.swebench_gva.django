@@ -26,6 +26,7 @@ from django.db.models import (
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import (
     Cast,
+    Coalesce,
     CumeDist,
     DenseRank,
     ExtractYear,
@@ -1406,6 +1407,28 @@ class WindowFunctionTests(TestCase):
                 {"department": "Management", "salary": 100000},
             ],
         )
+
+    def test_aggregate_over_window_function(self):
+        """Test aggregating over window functions (issue #34717)."""
+        from django.db.models import FloatField
+        
+        qs = Employee.objects.annotate(
+            cumul_salary=Coalesce(
+                Window(Sum("salary"), order_by=F("hire_date").asc()),
+                Value(0.0, output_field=FloatField()),
+                output_field=FloatField(),
+            )
+        )
+        aggregate = qs.aggregate(
+            salary_total=Sum("salary"),
+            cumul_salary_total=Sum("cumul_salary"),
+        )
+        # The aggregate should work without raising an error
+        self.assertIn("salary_total", aggregate)
+        self.assertIn("cumul_salary_total", aggregate)
+        self.assertEqual(aggregate["salary_total"], 637000)
+        # cumul_salary_total should be the sum of all cumulative salaries
+        self.assertIsNotNone(aggregate["cumul_salary_total"])
 
     @skipUnlessDBFeature("supports_json_field")
     def test_key_transform(self):
