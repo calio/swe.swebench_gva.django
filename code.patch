@@ -1,0 +1,47 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 0f53d9c30b..ed3ffa507d 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -2524,7 +2524,11 @@ class AutoFieldMeta(type):
+         return isinstance(instance, self._subclasses) or super().__instancecheck__(instance)
+ 
+     def __subclasscheck__(self, subclass):
+-        return subclass in self._subclasses or super().__subclasscheck__(subclass)
++        return (
++            subclass in self._subclasses
++            or any(issubclass(subclass, base) for base in self._subclasses)
++            or super().__subclasscheck__(subclass)
++        )
+ 
+ 
+ class AutoField(AutoFieldMixin, IntegerField, metaclass=AutoFieldMeta):
+diff --git a/tests/model_options/test_default_pk.py b/tests/model_options/test_default_pk.py
+index b678848916..3ffb26d0e8 100644
+--- a/tests/model_options/test_default_pk.py
++++ b/tests/model_options/test_default_pk.py
+@@ -99,3 +99,25 @@ class TestDefaultPK(SimpleTestCase):
+ 
+         m2m_pk = M2MModel._meta.get_field('m2m').remote_field.through._meta.pk
+         self.assertIsInstance(m2m_pk, models.SmallAutoField)
++
++    @isolate_apps('model_options')
++    def test_default_auto_field_subclass_of_big_auto_field(self):
++        class CustomBigAutoField(models.BigAutoField):
++            pass
++
++        with override_settings(DEFAULT_AUTO_FIELD='model_options.CustomBigAutoField'):
++            class Model(models.Model):
++                pass
++
++            self.assertIsInstance(Model._meta.pk, CustomBigAutoField)
++
++    @isolate_apps('model_options')
++    def test_default_auto_field_subclass_of_small_auto_field(self):
++        class CustomSmallAutoField(models.SmallAutoField):
++            pass
++
++        with override_settings(DEFAULT_AUTO_FIELD='model_options.CustomSmallAutoField'):
++            class Model(models.Model):
++                pass
++
++            self.assertIsInstance(Model._meta.pk, CustomSmallAutoField)

@@ -99,3 +99,25 @@ class TestDefaultPK(SimpleTestCase):
 
         m2m_pk = M2MModel._meta.get_field('m2m').remote_field.through._meta.pk
         self.assertIsInstance(m2m_pk, models.SmallAutoField)
+
+    @isolate_apps('model_options')
+    def test_default_auto_field_subclass_of_big_auto_field(self):
+        class CustomBigAutoField(models.BigAutoField):
+            pass
+
+        with override_settings(DEFAULT_AUTO_FIELD='model_options.CustomBigAutoField'):
+            class Model(models.Model):
+                pass
+
+            self.assertIsInstance(Model._meta.pk, CustomBigAutoField)
+
+    @isolate_apps('model_options')
+    def test_default_auto_field_subclass_of_small_auto_field(self):
+        class CustomSmallAutoField(models.SmallAutoField):
+            pass
+
+        with override_settings(DEFAULT_AUTO_FIELD='model_options.CustomSmallAutoField'):
+            class Model(models.Model):
+                pass
+
+            self.assertIsInstance(Model._meta.pk, CustomSmallAutoField)
