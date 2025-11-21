@@ -1178,7 +1178,7 @@ class BaseInlineFormSet(BaseModelFormSet):
             else:
                 to_field = self.instance._meta.pk
             if to_field.has_default():
-                setattr(self.instance, to_field.attname, None)
+                kwargs["initial"] = None
 
         form.fields[name] = InlineForeignKeyField(self.instance, **kwargs)
 
@@ -1350,7 +1350,7 @@ class InlineForeignKeyField(Field):
         self.parent_instance = parent_instance
         self.pk_field = pk_field
         self.to_field = to_field
-        if self.parent_instance is not None:
+        if self.parent_instance is not None and "initial" not in kwargs:
             if self.to_field:
                 kwargs["initial"] = getattr(self.parent_instance, self.to_field)
             else:

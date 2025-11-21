@@ -25,6 +25,8 @@ class InlineFormsetTests(TestCase):
         FormSet = inlineformset_factory(UUIDPKParent, UUIDPKChild, fields="__all__")
         formset = FormSet()
         self.assertIsNone(formset.forms[0].fields["parent"].initial)
+        # The parent instance should retain its UUID value
+        self.assertIsNotNone(formset.instance.uuid)
 
     def test_inlineformset_factory_ignores_default_pks_on_submit(self):
         """
@@ -55,6 +57,8 @@ class InlineFormsetTests(TestCase):
         )
         formset = FormSet()
         self.assertIsNone(formset.forms[0].fields["parent"].initial)
+        # The parent instance should retain its UUID value
+        self.assertIsNotNone(formset.instance.uuid)
 
     def test_inlineformset_factory_nulls_default_pks_auto_parent_uuid_child(self):
         """
@@ -67,6 +71,9 @@ class InlineFormsetTests(TestCase):
         )
         formset = FormSet()
         self.assertIsNone(formset.forms[0].fields["parent"].initial)
+        # The parent instance should retain its pk value (None for new objects)
+        # since AutoField doesn't have a default value like UUID does
+        self.assertIsNone(formset.instance.pk)
 
     def test_inlineformset_factory_nulls_default_pks_child_editable_pk(self):
         """
@@ -79,6 +86,8 @@ class InlineFormsetTests(TestCase):
         )
         formset = FormSet()
         self.assertIsNone(formset.forms[0].fields["parent"].initial)
+        # The parent instance should retain its UUID value
+        self.assertIsNotNone(formset.instance.uuid)
 
     def test_inlineformset_factory_nulls_default_pks_alternate_key_relation(self):
         """
@@ -91,3 +100,40 @@ class InlineFormsetTests(TestCase):
         )
         formset = FormSet()
         self.assertIsNone(formset.forms[0].fields["parent"].initial)
+        # The parent instance should retain its UUID value
+        self.assertIsNotNone(formset.instance.uuid)
+
+    def test_inlineformset_factory_preserves_uuid_on_save(self):
+        """
+        Test that when saving an inline formset with a UUID parent and child,
+        the parent's UUID is preserved and not set to NULL.
+        """
+        # Create a parent instance
+        parent = UUIDPKParent(name="Parent")
+        FormSet = inlineformset_factory(
+            UUIDPKParent, AutoPKChildOfUUIDPKParent, fields="__all__"
+        )
+        formset = FormSet(
+            {
+                "autopkchildofuuidpkparent_set-TOTAL_FORMS": 1,
+                "autopkchildofuuidpkparent_set-INITIAL_FORMS": 0,
+                "autopkchildofuuidpkparent_set-MAX_NUM_FORMS": "",
+                "autopkchildofuuidpkparent_set-0-name": "Child",
+            },
+            instance=parent,
+        )
+        self.assertTrue(formset.is_valid())
+        # Verify the parent's UUID is not None before saving
+        self.assertIsNotNone(parent.uuid)
+        parent_uuid = parent.uuid
+        # Save the parent first
+        parent.save()
+        # Save the formset (children)
+        formset.save()
+        # Verify the parent was saved with the same UUID (not NULL)
+        saved_parent = UUIDPKParent.objects.get(uuid=parent_uuid)
+        self.assertIsNotNone(saved_parent.uuid)
+        self.assertEqual(saved_parent.uuid, parent_uuid)
+        # Verify the child was created with the correct parent
+        child = AutoPKChildOfUUIDPKParent.objects.get(name="Child")
+        self.assertEqual(child.parent.uuid, parent_uuid)
