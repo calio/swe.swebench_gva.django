@@ -475,3 +475,26 @@ class NullableUniqueCharFieldModel(models.Model):
     email = models.EmailField(blank=True, null=True)
     slug = models.SlugField(blank=True, null=True)
     url = models.URLField(blank=True, null=True)
+
+
+# Models for testing limit_choices_to with Q objects involving joins
+class A(models.Model):
+    name = models.CharField(max_length=50)
+
+    def __str__(self):
+        return self.name
+
+
+class B(models.Model):
+    a = models.ForeignKey(A, models.CASCADE)
+    b = models.CharField(max_length=50)
+
+    def __str__(self):
+        return self.b
+
+
+class Baz(models.Model):
+    bar = models.ForeignKey(B, models.CASCADE, limit_choices_to=models.Q(a__name__startswith='a'))
+
+    def __str__(self):
+        return str(self.bar)

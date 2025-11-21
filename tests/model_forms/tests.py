@@ -18,9 +18,9 @@ from django.template import Context, Template
 from django.test import SimpleTestCase, TestCase, skipUnlessDBFeature
 
 from .models import (
-    Article, ArticleStatus, Author, Author1, Award, BetterWriter, BigInt, Book,
-    Category, Character, Colour, ColourfulItem, CustomErrorMessage, CustomFF,
-    CustomFieldForExclusionModel, DateTimePost, DerivedBook, DerivedPost,
+    A, Article, ArticleStatus, Author, Author1, Award, B, Baz, BetterWriter,
+    BigInt, Book, Category, Character, Colour, ColourfulItem, CustomErrorMessage,
+    CustomFF, CustomFieldForExclusionModel, DateTimePost, DerivedBook, DerivedPost,
     Document, ExplicitPK, FilePathModel, FlexibleDatePost, Homepage,
     ImprovedArticle, ImprovedArticleWithParentLink, Inventory,
     NullableUniqueCharFieldModel, Person, Photo, Post, Price, Product,
@@ -168,6 +168,12 @@ class CustomErrorMessageForm(forms.ModelForm):
     class Meta:
         fields = '__all__'
         model = CustomErrorMessage
+
+
+class BazForm(forms.ModelForm):
+    class Meta:
+        model = Baz
+        fields = '__all__'
 
 
 class ModelFormBaseTest(TestCase):
@@ -2828,6 +2834,28 @@ class LimitChoicesToTests(TestCase):
             self.assertEqual(today_callable_dict.call_count, 2)
             StumpJokeForm()
             self.assertEqual(today_callable_dict.call_count, 3)
+
+    def test_limit_choices_to_with_q_object_and_join(self):
+        """
+        Regression test for #11707: limit_choices_to on a ForeignKey with a Q
+        object involving a join should not render duplicate options in formfield.
+        """
+        # Create test data - multiple B objects for the same A to trigger duplicates
+        a1 = A.objects.create(name='apple')
+        a2 = A.objects.create(name='banana')
+        b1 = B.objects.create(a=a1, b='b1')
+        b2 = B.objects.create(a=a1, b='b2')
+        b3 = B.objects.create(a=a2, b='b3')
+
+        # Create form and check that there are no duplicate options
+        form = BazForm()
+        queryset = form.fields['bar'].queryset
+        # The queryset should only contain b1 and b2 (where a.name starts with 'a')
+        # and should not have duplicates
+        queryset_list = list(queryset)
+        self.assertEqual(queryset_list, [b1, b2])
+        # Check that there are no duplicates
+        self.assertEqual(len(queryset_list), len(set(queryset_list)))
 
 
 class FormFieldCallbackTests(SimpleTestCase):

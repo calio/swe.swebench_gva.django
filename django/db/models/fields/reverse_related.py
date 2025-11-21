@@ -150,7 +150,7 @@ class ForeignObjectRel(FieldCacheMixin):
         initially for utilization by RelatedFieldListFilter.
         """
         limit_choices_to = limit_choices_to or self.limit_choices_to
-        qs = self.related_model._default_manager.complex_filter(limit_choices_to)
+        qs = self.related_model._default_manager.complex_filter(limit_choices_to).distinct()
         if ordering:
             qs = qs.order_by(*ordering)
         return (blank_choice if include_blank else []) + [
