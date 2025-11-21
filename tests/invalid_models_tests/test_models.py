@@ -893,6 +893,18 @@ class OtherModelTests(SimpleTestCase):
         with register_lookup(models.CharField, Lower):
             self.assertEqual(Model.check(), [])
 
+    def test_ordering_allows_builtin_lookups(self):
+        class Parent(models.Model):
+            pass
+
+        class Child(models.Model):
+            parent = models.ForeignKey(Parent, models.CASCADE, null=True)
+
+            class Meta:
+                ordering = ('parent__isnull',)
+
+        self.assertEqual(Child.check(), [])
+
     def test_ordering_pointing_to_related_model_pk(self):
         class Parent(models.Model):
             pass
