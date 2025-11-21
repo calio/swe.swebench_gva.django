@@ -922,6 +922,50 @@ class WriterTests(SimpleTestCase):
             output,
         )
 
+    def test_sorted_imports_with_multiple_imports(self):
+        """
+        Test that imports are sorted with all import statements before
+        from statements, following Django coding style and isort defaults.
+        """
+        migration = type(
+            "Migration",
+            (migrations.Migration,),
+            {
+                "operations": [
+                    migrations.AddField(
+                        "mymodel",
+                        "myfield",
+                        models.TimeField(
+                            default=datetime.time(1, 1),
+                        ),
+                    ),
+                ]
+            },
+        )
+        writer = MigrationWriter(migration)
+        output = writer.as_string()
+        # Extract the imports section
+        imports_section = output.split("\n\nclass Migration")[0].split("\n\n", 1)[1]
+        # Verify that all import statements come before from statements
+        import_lines = [line for line in imports_section.split("\n") if line.strip()]
+        import_stmts = [line for line in import_lines if line.startswith("import ")]
+        from_stmts = [line for line in import_lines if line.startswith("from ")]
+        
+        # Find the index of the last import statement and first from statement
+        if import_stmts and from_stmts:
+            last_import_idx = max(
+                i for i, line in enumerate(import_lines) if line.startswith("import ")
+            )
+            first_from_idx = min(
+                i for i, line in enumerate(import_lines) if line.startswith("from ")
+            )
+            self.assertLess(
+                last_import_idx,
+                first_from_idx,
+                f"Import statements should come before from statements. "
+                f"Got: {import_lines}",
+            )
+
     def test_migration_file_header_comments(self):
         """
         Test comments at top of file.

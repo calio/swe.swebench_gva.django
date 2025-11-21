@@ -1,0 +1,82 @@
+diff --git a/django/db/migrations/writer.py b/django/db/migrations/writer.py
+index a59f0c8dcb..6062a4065c 100644
+--- a/django/db/migrations/writer.py
++++ b/django/db/migrations/writer.py
+@@ -173,9 +173,19 @@ class MigrationWriter:
+         else:
+             imports.add("from django.db import migrations")
+ 
+-        # Sort imports by the package / module to be imported (the part after
+-        # "from" in "from ... import ..." or after "import" in "import ...").
+-        sorted_imports = sorted(imports, key=lambda i: i.split()[1])
++        # Sort imports: all "import" statements before "from" statements,
++        # then alphabetically by module name within each group.
++        # This follows Django coding style and isort defaults.
++        def sort_key(import_statement):
++            # Separate import statements from from statements
++            is_from_import = import_statement.startswith("from ")
++            # Extract the module name for secondary sorting
++            module_name = import_statement.split()[1]
++            # Return tuple: (is_from_import, module_name)
++            # This ensures all "import" statements come before "from" statements
++            return (is_from_import, module_name)
++
++        sorted_imports = sorted(imports, key=sort_key)
+         items["imports"] = "\n".join(sorted_imports) + "\n" if imports else ""
+         if migration_imports:
+             items["imports"] += (
+diff --git a/tests/migrations/test_writer.py b/tests/migrations/test_writer.py
+index 1c11c68e97..4da2f6e0ef 100644
+--- a/tests/migrations/test_writer.py
++++ b/tests/migrations/test_writer.py
+@@ -922,6 +922,50 @@ class WriterTests(SimpleTestCase):
+             output,
+         )
+ 
++    def test_sorted_imports_with_multiple_imports(self):
++        """
++        Test that imports are sorted with all import statements before
++        from statements, following Django coding style and isort defaults.
++        """
++        migration = type(
++            "Migration",
++            (migrations.Migration,),
++            {
++                "operations": [
++                    migrations.AddField(
++                        "mymodel",
++                        "myfield",
++                        models.TimeField(
++                            default=datetime.time(1, 1),
++                        ),
++                    ),
++                ]
++            },
++        )
++        writer = MigrationWriter(migration)
++        output = writer.as_string()
++        # Extract the imports section
++        imports_section = output.split("\n\nclass Migration")[0].split("\n\n", 1)[1]
++        # Verify that all import statements come before from statements
++        import_lines = [line for line in imports_section.split("\n") if line.strip()]
++        import_stmts = [line for line in import_lines if line.startswith("import ")]
++        from_stmts = [line for line in import_lines if line.startswith("from ")]
++        
++        # Find the index of the last import statement and first from statement
++        if import_stmts and from_stmts:
++            last_import_idx = max(
++                i for i, line in enumerate(import_lines) if line.startswith("import ")
++            )
++            first_from_idx = min(
++                i for i, line in enumerate(import_lines) if line.startswith("from ")
++            )
++            self.assertLess(
++                last_import_idx,
++                first_from_idx,
++                f"Import statements should come before from statements. "
++                f"Got: {import_lines}",
++            )
++
+     def test_migration_file_header_comments(self):
+         """
+         Test comments at top of file.
