@@ -132,10 +132,27 @@ def call_command(command_name, *args, **options):
     parser_actions = list(get_actions(parser))
     # Any required arguments which are passed in via **options must be passed
     # to parse_args().
+    required_dests = {opt.dest for opt in parser_actions if opt.required}
     parse_args += [
         '{}={}'.format(min(opt.option_strings), arg_options[opt.dest])
         for opt in parser_actions if opt.required and opt.dest in options
     ]
+    # Also handle arguments that are part of a required mutually exclusive group.
+    def get_mutually_exclusive_groups(parser):
+        # Get mutually exclusive groups from parser and all subparsers.
+        for group in parser._mutually_exclusive_groups:
+            yield group
+        for action in parser._actions:
+            if isinstance(action, _SubParsersAction):
+                for subparser in action.choices.values():
+                    yield from get_mutually_exclusive_groups(subparser)
+    
+    for group in get_mutually_exclusive_groups(parser):
+        if group.required:
+            for action in group._group_actions:
+                if action.dest in options and action.dest not in required_dests:
+                    parse_args.append('{}={}'.format(min(action.option_strings), arg_options[action.dest]))
+                    break
     defaults = parser.parse_args(args=parse_args)
     defaults = dict(defaults._get_kwargs(), **arg_options)
     # Raise an error if any unknown options were passed.

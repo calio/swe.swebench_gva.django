@@ -209,6 +209,33 @@ class CommandTests(SimpleTestCase):
         self.assertIn('need_me', out.getvalue())
         self.assertIn('needme2', out.getvalue())
 
+    def test_call_command_with_required_mutually_exclusive_group_via_kwargs(self):
+        """
+        call_command should work when an argument of a required mutually
+        exclusive group is passed via kwargs.
+        """
+        out = StringIO()
+        management.call_command('mutually_exclusive', shop_id=1, stdout=out)
+        self.assertIn('Shop ID: 1', out.getvalue())
+
+    def test_call_command_with_required_mutually_exclusive_group_via_args(self):
+        """
+        call_command should work when an argument of a required mutually
+        exclusive group is passed via args.
+        """
+        out = StringIO()
+        management.call_command('mutually_exclusive', '--shop-id=1', stdout=out)
+        self.assertIn('Shop ID: 1', out.getvalue())
+
+    def test_call_command_with_required_mutually_exclusive_group_alternative_arg(self):
+        """
+        call_command should work when an alternative argument of a required
+        mutually exclusive group is passed via kwargs.
+        """
+        out = StringIO()
+        management.call_command('mutually_exclusive', shop_name='test_shop', stdout=out)
+        self.assertIn('Shop Name: test_shop', out.getvalue())
+
     def test_command_add_arguments_after_common_arguments(self):
         out = StringIO()
         management.call_command('common_args', stdout=out)
