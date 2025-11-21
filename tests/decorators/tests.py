@@ -425,6 +425,27 @@ class MethodDecoratorTests(SimpleTestCase):
                 def __module__(cls):
                     return "tests"
 
+    def test_decorator_with_wraps(self):
+        """
+        @method_decorator should work with decorators that use @wraps().
+        Regression test for issue where functools.partial objects don't have
+        attributes like __name__, __module__, etc.
+        """
+        def logger(func):
+            @wraps(func)
+            def inner(*args, **kwargs):
+                return func(*args, **kwargs)
+            return inner
+
+        class Test:
+            @method_decorator(logger)
+            def hello_world(self):
+                return "hello"
+
+        obj = Test()
+        self.assertEqual(obj.hello_world(), "hello")
+        self.assertEqual(Test.hello_world.__name__, "hello_world")
+
 
 class XFrameOptionsDecoratorsTests(TestCase):
     """

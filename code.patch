@@ -1,0 +1,46 @@
+diff --git a/django/utils/decorators.py b/django/utils/decorators.py
+index 5c9a5d01c7..730d5a917d 100644
+--- a/django/utils/decorators.py
++++ b/django/utils/decorators.py
+@@ -38,6 +38,9 @@ def _multi_decorate(decorators, method):
+         # 'func'. Also, wrap method.__get__() in a function because new
+         # attributes can't be set on bound method objects, only on functions.
+         bound_method = partial(method.__get__(self, type(self)))
++        # Preserve wrapper assignments on the partial object so that decorators
++        # using @wraps() can access standard function attributes.
++        update_wrapper(bound_method, method)
+         for dec in decorators:
+             bound_method = dec(bound_method)
+         return bound_method(*args, **kwargs)
+diff --git a/tests/decorators/tests.py b/tests/decorators/tests.py
+index 46b01c1852..78e3243b7f 100644
+--- a/tests/decorators/tests.py
++++ b/tests/decorators/tests.py
+@@ -425,6 +425,27 @@ class MethodDecoratorTests(SimpleTestCase):
+                 def __module__(cls):
+                     return "tests"
+ 
++    def test_decorator_with_wraps(self):
++        """
++        @method_decorator should work with decorators that use @wraps().
++        Regression test for issue where functools.partial objects don't have
++        attributes like __name__, __module__, etc.
++        """
++        def logger(func):
++            @wraps(func)
++            def inner(*args, **kwargs):
++                return func(*args, **kwargs)
++            return inner
++
++        class Test:
++            @method_decorator(logger)
++            def hello_world(self):
++                return "hello"
++
++        obj = Test()
++        self.assertEqual(obj.hello_world(), "hello")
++        self.assertEqual(Test.hello_world.__name__, "hello_world")
++
+ 
+ class XFrameOptionsDecoratorsTests(TestCase):
+     """
