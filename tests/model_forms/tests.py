@@ -704,6 +704,31 @@ class ModelFormBaseTest(TestCase):
         m2 = mf2.save(commit=False)
         self.assertEqual(m2.date_published, datetime.date(2010, 1, 1))
 
+    def test_cleaned_data_overrides_default_value(self):
+        """
+        Test that cleaned_data can override a field's default value.
+        This tests the fix for allowing cleaned_data to overwrite fields' default values.
+        """
+        class PubForm(forms.ModelForm):
+            mode = forms.CharField(max_length=2, required=False)
+
+            class Meta:
+                model = PublicationDefaults
+                fields = ('mode',)
+
+            def clean(self):
+                cleaned_data = super().clean()
+                # Override the mode field in cleaned_data even though it's not in the form data
+                cleaned_data['mode'] = 'de'
+                return cleaned_data
+
+        # Empty data - field not in form data, but we override it in clean()
+        mf = PubForm({})
+        self.assertEqual(mf.errors, {})
+        m = mf.save(commit=False)
+        # The mode should be 'de' (from cleaned_data), not 'di' (the default)
+        self.assertEqual(m.mode, 'de')
+
 
 class FieldOverridesByFormMetaForm(forms.ModelForm):
     class Meta:

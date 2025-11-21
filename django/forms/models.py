@@ -33,6 +33,7 @@ def construct_instance(form, instance, fields=None, exclude=None):
     Construct and return a model instance from the bound ``form``'s
     ``cleaned_data``, but do not save the returned instance to the database.
     """
+    from django.core.validators import EMPTY_VALUES
     from django.db import models
     opts = instance._meta
 
@@ -50,7 +51,15 @@ def construct_instance(form, instance, fields=None, exclude=None):
         # checkbox inputs because they don't appear in POST data if not checked.
         if (f.has_default() and
                 form[f.name].field.widget.value_omitted_from_data(form.data, form.files, form.add_prefix(f.name))):
-            continue
+            # However, if the user has explicitly set a non-empty value in
+            # cleaned_data (e.g., in the form's clean() method), we should
+            # respect that instead of using the model field's default.
+            if cleaned_data[f.name] not in EMPTY_VALUES:
+                # User has set a non-empty value, so use it
+                pass
+            else:
+                # Value is empty, so use the model field's default
+                continue
         # Defer saving file-type fields until after the other fields, so a
         # callable upload_to can use the values from other fields.
         if isinstance(f, models.FileField):
