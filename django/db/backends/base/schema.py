@@ -566,6 +566,7 @@ class BaseDatabaseSchemaEditor:
             model,
             columns,
             exclude=meta_constraint_names | meta_index_names,
+            primary_key=False,
             **constraint_kwargs,
         )
         if len(constraint_names) != 1:
