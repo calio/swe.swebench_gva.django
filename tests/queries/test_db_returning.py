@@ -4,7 +4,10 @@ from django.db import connection
 from django.test import TestCase, skipUnlessDBFeature
 from django.test.utils import CaptureQueriesContext
 
-from .models import DumbCategory, NonIntegerPKReturningModel, ReturningModel
+from .models import (
+    DumbCategory, NonIntegerPKReturningModel, ReturningModel, ConverterModel,
+    IntWrapper,
+)
 
 
 @skipUnlessDBFeature('can_return_columns_from_insert')
@@ -49,3 +52,29 @@ class ReturningValuesTests(TestCase):
             with self.subTest(obj=obj):
                 self.assertTrue(obj.pk)
                 self.assertIsInstance(obj.created, datetime.datetime)
+
+
+@skipUnlessDBFeature('can_return_columns_from_insert')
+class ConverterReturningFieldsTests(TestCase):
+    """Test that converters are applied to returning fields."""
+    
+    def test_create_applies_converter(self):
+        """Test that create() applies from_db_value converter to returned fields."""
+        obj = ConverterModel.objects.create()
+        self.assertIsInstance(obj.id, IntWrapper,
+            f"Expected IntWrapper but got {type(obj.id)}")
+    
+    def test_query_applies_converter(self):
+        """Test that normal queries apply from_db_value converter."""
+        obj = ConverterModel.objects.create()
+        obj2 = ConverterModel.objects.first()
+        self.assertIsInstance(obj2.id, IntWrapper,
+            f"Expected IntWrapper but got {type(obj2.id)}")
+    
+    @skipUnlessDBFeature('can_return_rows_from_bulk_insert')
+    def test_bulk_create_applies_converter(self):
+        """Test that bulk_create() applies from_db_value converter to returned fields."""
+        objs = [ConverterModel()]
+        ConverterModel.objects.bulk_create(objs)
+        self.assertIsInstance(objs[0].id, IntWrapper,
+            f"Expected IntWrapper but got {type(objs[0].id)}")

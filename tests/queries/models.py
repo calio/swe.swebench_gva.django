@@ -743,6 +743,45 @@ class NonIntegerPKReturningModel(models.Model):
     created = CreatedField(editable=False, primary_key=True)
 
 
+class IntWrapper:
+    """Wrapper class for testing from_db_value converters."""
+    def __init__(self, value):
+        self.value = value
+    
+    def __repr__(self):
+        return f'<IntWrapper: {self.value}>'
+    
+    def __eq__(self, other):
+        if isinstance(other, IntWrapper):
+            return self.value == other.value
+        return self.value == other
+    
+    def __int__(self):
+        return self.value
+
+
+class ConverterField(models.BigAutoField):
+    """Custom field with from_db_value converter for testing."""
+    db_returning = True
+    
+    def from_db_value(self, value, expression, connection):
+        if value is None:
+            return None
+        return IntWrapper(value)
+    
+    def get_prep_value(self, value):
+        if value is None:
+            return None
+        if isinstance(value, IntWrapper):
+            return int(value)
+        return int(value)
+
+
+class ConverterModel(models.Model):
+    """Model with a field that has a from_db_value converter."""
+    id = ConverterField(primary_key=True)
+
+
 class JSONFieldNullable(models.Model):
     json_field = models.JSONField(blank=True, null=True)
 

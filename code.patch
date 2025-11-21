@@ -1,0 +1,130 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index f02199d97c..8483fda411 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1412,13 +1412,23 @@ class SQLInsertCompiler(SQLCompiler):
+             if not self.returning_fields:
+                 return []
+             if self.connection.features.can_return_rows_from_bulk_insert and len(self.query.objs) > 1:
+-                return self.connection.ops.fetch_returned_insert_rows(cursor)
+-            if self.connection.features.can_return_columns_from_insert:
++                rows = self.connection.ops.fetch_returned_insert_rows(cursor)
++            elif self.connection.features.can_return_columns_from_insert:
+                 assert len(self.query.objs) == 1
+-                return [self.connection.ops.fetch_returned_insert_columns(cursor, self.returning_params)]
+-            return [(self.connection.ops.last_insert_id(
+-                cursor, self.query.get_meta().db_table, self.query.get_meta().pk.column
+-            ),)]
++                rows = [self.connection.ops.fetch_returned_insert_columns(cursor, self.returning_params)]
++            else:
++                rows = [(self.connection.ops.last_insert_id(
++                    cursor, self.query.get_meta().db_table, self.query.get_meta().pk.column
++                ),)]
++            
++            # Apply converters to returned values
++            # Create Col expressions from the returning fields for converter lookup
++            from django.db.models.expressions import Col
++            expressions = [Col(None, field, output_field=field) for field in self.returning_fields]
++            converters = self.get_converters(expressions)
++            if converters:
++                rows = list(self.apply_converters(rows, converters))
++            return rows
+ 
+ 
+ class SQLDeleteCompiler(SQLCompiler):
+diff --git a/tests/queries/models.py b/tests/queries/models.py
+index 383f633be9..e327f8ce15 100644
+--- a/tests/queries/models.py
++++ b/tests/queries/models.py
+@@ -743,6 +743,45 @@ class NonIntegerPKReturningModel(models.Model):
+     created = CreatedField(editable=False, primary_key=True)
+ 
+ 
++class IntWrapper:
++    """Wrapper class for testing from_db_value converters."""
++    def __init__(self, value):
++        self.value = value
++    
++    def __repr__(self):
++        return f'<IntWrapper: {self.value}>'
++    
++    def __eq__(self, other):
++        if isinstance(other, IntWrapper):
++            return self.value == other.value
++        return self.value == other
++    
++    def __int__(self):
++        return self.value
++
++
++class ConverterField(models.BigAutoField):
++    """Custom field with from_db_value converter for testing."""
++    db_returning = True
++    
++    def from_db_value(self, value, expression, connection):
++        if value is None:
++            return None
++        return IntWrapper(value)
++    
++    def get_prep_value(self, value):
++        if value is None:
++            return None
++        if isinstance(value, IntWrapper):
++            return int(value)
++        return int(value)
++
++
++class ConverterModel(models.Model):
++    """Model with a field that has a from_db_value converter."""
++    id = ConverterField(primary_key=True)
++
++
+ class JSONFieldNullable(models.Model):
+     json_field = models.JSONField(blank=True, null=True)
+ 
+diff --git a/tests/queries/test_db_returning.py b/tests/queries/test_db_returning.py
+index 9ba352a7ab..2a8e970fe1 100644
+--- a/tests/queries/test_db_returning.py
++++ b/tests/queries/test_db_returning.py
+@@ -4,7 +4,10 @@ from django.db import connection
+ from django.test import TestCase, skipUnlessDBFeature
+ from django.test.utils import CaptureQueriesContext
+ 
+-from .models import DumbCategory, NonIntegerPKReturningModel, ReturningModel
++from .models import (
++    DumbCategory, NonIntegerPKReturningModel, ReturningModel, ConverterModel,
++    IntWrapper,
++)
+ 
+ 
+ @skipUnlessDBFeature('can_return_columns_from_insert')
+@@ -49,3 +52,29 @@ class ReturningValuesTests(TestCase):
+             with self.subTest(obj=obj):
+                 self.assertTrue(obj.pk)
+                 self.assertIsInstance(obj.created, datetime.datetime)
++
++
++@skipUnlessDBFeature('can_return_columns_from_insert')
++class ConverterReturningFieldsTests(TestCase):
++    """Test that converters are applied to returning fields."""
++    
++    def test_create_applies_converter(self):
++        """Test that create() applies from_db_value converter to returned fields."""
++        obj = ConverterModel.objects.create()
++        self.assertIsInstance(obj.id, IntWrapper,
++            f"Expected IntWrapper but got {type(obj.id)}")
++    
++    def test_query_applies_converter(self):
++        """Test that normal queries apply from_db_value converter."""
++        obj = ConverterModel.objects.create()
++        obj2 = ConverterModel.objects.first()
++        self.assertIsInstance(obj2.id, IntWrapper,
++            f"Expected IntWrapper but got {type(obj2.id)}")
++    
++    @skipUnlessDBFeature('can_return_rows_from_bulk_insert')
++    def test_bulk_create_applies_converter(self):
++        """Test that bulk_create() applies from_db_value converter to returned fields."""
++        objs = [ConverterModel()]
++        ConverterModel.objects.bulk_create(objs)
++        self.assertIsInstance(objs[0].id, IntWrapper,
++            f"Expected IntWrapper but got {type(objs[0].id)}")
