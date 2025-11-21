@@ -118,3 +118,16 @@ class TestUtils(AdminDocsSimpleTestCase):
         markup = '<p>reST, <cite>interpreted text</cite>, default role.</p>\n'
         parts = docutils.core.publish_parts(source=source, writer_name="html4css1")
         self.assertEqual(parts['fragment'], markup)
+
+    def test_trim_docstring_with_non_empty_first_line(self):
+        """
+        Test that trim_docstring correctly handles docstrings where the
+        first line is not empty (contains text).
+        """
+        docstring = """Summary line.
+        
+        More details here.
+        With indentation."""
+        result = trim_docstring(docstring)
+        expected = 'Summary line.\n\nMore details here.\nWith indentation.'
+        self.assertEqual(result, expected)
