@@ -912,6 +912,45 @@ class FieldCallableFileStorageTests(SimpleTestCase):
         self.assertEqual(obj.storage_callable.storage.location, temp_storage_location)
         self.assertIsInstance(obj.storage_callable_class.storage, BaseStorage)
 
+    def test_callable_function_storage_deconstruct(self):
+        """
+        FileField.deconstruct() should return the original callable storage,
+        not the evaluated storage instance.
+        """
+        storage = FileSystemStorage(location=self.temp_storage_location)
+
+        def get_storage():
+            return storage
+
+        field = FileField(storage=get_storage)
+        name, path, args, kwargs = field.deconstruct()
+        # The deconstructed storage should be the original callable
+        self.assertIs(kwargs['storage'], get_storage)
+
+    def test_callable_class_storage_deconstruct(self):
+        """
+        FileField.deconstruct() should return the original callable class storage,
+        not the evaluated storage instance.
+        """
+        class GetStorage(FileSystemStorage):
+            pass
+
+        field = FileField(storage=GetStorage)
+        name, path, args, kwargs = field.deconstruct()
+        # The deconstructed storage should be the original callable class
+        self.assertIs(kwargs['storage'], GetStorage)
+
+    def test_non_callable_storage_deconstruct(self):
+        """
+        FileField.deconstruct() should return the storage instance for
+        non-callable storage.
+        """
+        storage = FileSystemStorage(location=self.temp_storage_location)
+        field = FileField(storage=storage)
+        name, path, args, kwargs = field.deconstruct()
+        # The deconstructed storage should be the storage instance
+        self.assertIs(kwargs['storage'], storage)
+
 
 # Tests for a race condition on file saving (#4948).
 # This is written in such a way that it'll always pass on platforms

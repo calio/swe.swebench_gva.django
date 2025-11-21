@@ -1,0 +1,75 @@
+diff --git a/django/db/models/fields/files.py b/django/db/models/fields/files.py
+index e10a5bb6d9..c075dcf7c4 100644
+--- a/django/db/models/fields/files.py
++++ b/django/db/models/fields/files.py
+@@ -228,7 +228,10 @@ class FileField(Field):
+         self._primary_key_set_explicitly = 'primary_key' in kwargs
+ 
+         self.storage = storage or default_storage
++        # Store the original storage parameter for deconstruction
++        self._storage_callable = None
+         if callable(self.storage):
++            self._storage_callable = self.storage
+             self.storage = self.storage()
+             if not isinstance(self.storage, Storage):
+                 raise TypeError(
+@@ -279,7 +282,8 @@ class FileField(Field):
+             del kwargs["max_length"]
+         kwargs['upload_to'] = self.upload_to
+         if self.storage is not default_storage:
+-            kwargs['storage'] = self.storage
++            # Return the original callable if it was provided, otherwise return the storage instance
++            kwargs['storage'] = self._storage_callable or self.storage
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+diff --git a/tests/file_storage/tests.py b/tests/file_storage/tests.py
+index 4bac3ca11d..7d02842eef 100644
+--- a/tests/file_storage/tests.py
++++ b/tests/file_storage/tests.py
+@@ -912,6 +912,45 @@ class FieldCallableFileStorageTests(SimpleTestCase):
+         self.assertEqual(obj.storage_callable.storage.location, temp_storage_location)
+         self.assertIsInstance(obj.storage_callable_class.storage, BaseStorage)
+ 
++    def test_callable_function_storage_deconstruct(self):
++        """
++        FileField.deconstruct() should return the original callable storage,
++        not the evaluated storage instance.
++        """
++        storage = FileSystemStorage(location=self.temp_storage_location)
++
++        def get_storage():
++            return storage
++
++        field = FileField(storage=get_storage)
++        name, path, args, kwargs = field.deconstruct()
++        # The deconstructed storage should be the original callable
++        self.assertIs(kwargs['storage'], get_storage)
++
++    def test_callable_class_storage_deconstruct(self):
++        """
++        FileField.deconstruct() should return the original callable class storage,
++        not the evaluated storage instance.
++        """
++        class GetStorage(FileSystemStorage):
++            pass
++
++        field = FileField(storage=GetStorage)
++        name, path, args, kwargs = field.deconstruct()
++        # The deconstructed storage should be the original callable class
++        self.assertIs(kwargs['storage'], GetStorage)
++
++    def test_non_callable_storage_deconstruct(self):
++        """
++        FileField.deconstruct() should return the storage instance for
++        non-callable storage.
++        """
++        storage = FileSystemStorage(location=self.temp_storage_location)
++        field = FileField(storage=storage)
++        name, path, args, kwargs = field.deconstruct()
++        # The deconstructed storage should be the storage instance
++        self.assertIs(kwargs['storage'], storage)
++
+ 
+ # Tests for a race condition on file saving (#4948).
+ # This is written in such a way that it'll always pass on platforms

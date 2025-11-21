@@ -228,7 +228,10 @@ class FileField(Field):
         self._primary_key_set_explicitly = 'primary_key' in kwargs
 
         self.storage = storage or default_storage
+        # Store the original storage parameter for deconstruction
+        self._storage_callable = None
         if callable(self.storage):
+            self._storage_callable = self.storage
             self.storage = self.storage()
             if not isinstance(self.storage, Storage):
                 raise TypeError(
@@ -279,7 +282,8 @@ class FileField(Field):
             del kwargs["max_length"]
         kwargs['upload_to'] = self.upload_to
         if self.storage is not default_storage:
-            kwargs['storage'] = self.storage
+            # Return the original callable if it was provided, otherwise return the storage instance
+            kwargs['storage'] = self._storage_callable or self.storage
         return name, path, args, kwargs
 
     def get_internal_type(self):
