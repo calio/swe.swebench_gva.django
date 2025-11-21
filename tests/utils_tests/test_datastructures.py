@@ -55,6 +55,10 @@ class OrderedSetTests(SimpleTestCase):
         s.add(2)
         self.assertEqual(len(s), 2)
 
+    def test_reversed(self):
+        s = OrderedSet([1, 2, 3])
+        self.assertEqual(list(reversed(s)), [3, 2, 1])
+
 
 class MultiValueDictTests(SimpleTestCase):
 

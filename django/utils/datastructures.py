@@ -34,6 +34,9 @@ class OrderedSet:
     def __len__(self):
         return len(self.dict)
 
+    def __reversed__(self):
+        return reversed(self.dict)
+
 
 class MultiValueDictKeyError(KeyError):
     pass
