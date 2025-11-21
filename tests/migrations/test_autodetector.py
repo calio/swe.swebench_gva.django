@@ -35,6 +35,22 @@ class DeconstructibleObject:
         )
 
 
+class CustomFKField(models.ForeignKey):
+    """
+    A custom ForeignKey field that hardcodes its 'to' argument.
+    Used for testing that the autodetector handles custom FK fields
+    that remove the 'to' key from their deconstructed kwargs.
+    """
+    def __init__(self, *args, **kwargs):
+        kwargs['to'] = 'testapp.HardcodedModel'
+        super().__init__(*args, **kwargs)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        del kwargs["to"]
+        return name, path, args, kwargs
+
+
 class AutodetectorTests(TestCase):
     """
     Tests the migration autodetector.
@@ -2132,6 +2148,21 @@ class AutodetectorTests(TestCase):
         self.assertOperationTypes(changes, 'testapp', 0, ["RemoveField", "DeleteModel"])
         self.assertOperationAttributes(changes, 'testapp', 0, 0, name="publisher")
         self.assertOperationAttributes(changes, 'testapp', 0, 1, name="Publisher")
+
+    def test_custom_fk_field_with_hardcoded_to(self):
+        """
+        #15104 - The autodetector should handle custom ForeignKey fields that
+        hardcode their 'to' argument and remove it from deconstructed kwargs.
+        """
+        hardcoded_model = ModelState('testapp', 'HardcodedModel', [])
+        test_model = ModelState('testapp', 'TestModel', [
+            ('custom', CustomFKField(on_delete=models.CASCADE))
+        ])
+        changes = self.get_changes([hardcoded_model], [hardcoded_model, test_model])
+        # Right number/type of migrations?
+        self.assertNumberMigrations(changes, 'testapp', 1)
+        self.assertOperationTypes(changes, 'testapp', 0, ["CreateModel"])
+        self.assertOperationAttributes(changes, 'testapp', 0, 0, name="TestModel")
 
     @mock.patch('django.db.migrations.questioner.MigrationQuestioner.ask_not_null_addition',
                 side_effect=AssertionError("Should not have prompted for not null addition"))
