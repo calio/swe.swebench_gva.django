@@ -1862,6 +1862,32 @@ class SaveAsTests(TestCase):
         self.assertFalse(response.context["show_save_and_continue"])
         self.assertTrue(response.context["show_save_as_new"])
 
+    def test_save_as_new_button_not_shown_without_add_permission(self):
+        """
+        The "Save as new" button should not be shown to users without
+        the 'add' permission, even if they have 'change' permission.
+        """
+        # Create a user with only change permission
+        changeuser = User.objects.create_user(
+            username="changeonly", password="secret", is_staff=True
+        )
+        opts = Person._meta
+        changeuser.user_permissions.add(
+            get_perm(Person, get_permission_codename("change", opts))
+        )
+
+        # Login as changeuser and access the change view
+        self.client.force_login(changeuser)
+        response = self.client.get(
+            reverse("admin:admin_views_person_change", args=(self.per1.pk,))
+        )
+
+        # The "Save as new" button should not be shown
+        self.assertFalse(response.context["show_save_as_new"])
+
+        # But the user should still be able to see the change form
+        self.assertEqual(response.status_code, 200)
+
 
 @override_settings(ROOT_URLCONF="admin_views.urls")
 class CustomModelAdminTest(AdminViewBasicTestCase):
