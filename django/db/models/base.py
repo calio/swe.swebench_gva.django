@@ -840,6 +840,8 @@ class Model(metaclass=ModelBase):
                        if f.name in update_fields or f.attname in update_fields]
 
         pk_val = self._get_pk_val(meta)
+        pk_was_none = pk_val is None
+        adding = self._state.adding
         if pk_val is None:
             pk_val = meta.pk.get_pk_value_on_save(self)
             setattr(self, meta.pk.attname, pk_val)
@@ -850,7 +852,9 @@ class Model(metaclass=ModelBase):
         # Skip an UPDATE when adding an instance and primary key has a default.
         if (
             not force_insert and
-            self._state.adding and
+            adding and
+            pk_was_none and
+            not raw and
             self._meta.pk.default and
             self._meta.pk.default is not NOT_PROVIDED
         ):
