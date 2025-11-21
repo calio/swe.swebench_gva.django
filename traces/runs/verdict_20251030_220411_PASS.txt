@@ -1,0 +1,36 @@
+================================================================================
+VERIFICATION VERDICT
+================================================================================
+
+Timestamp: 20251030_220411
+Model: gpt-5-codex
+Iterations: 14
+
+================================================================================
+VERDICT: PASS
+================================================================================
+
+REASONING:
+--------------------------------------------------------------------------------
+**VERDICT: PASS ✅**
+
+### Summary of Verification
+- Reviewed the implementation in `django/contrib/auth/__init__.py`: a new helper `_verify_session_auth_hash()` now compares the stored session hash against both the current `SECRET_KEY` and any keys listed in `SECRET_KEY_FALLBACKS`. This ensures sessions created with previous keys remain valid after key rotation.
+- Confirmed `get_user()` now delegates session-hash validation to this helper, so old sessions aren’t flushed merely because the project’s main key changed.
+- Validated the new regression test `test_session_valid_with_fallback_key()` in `tests/auth_tests/test_middleware.py`, which simulates exactly the reported problem and confirms the fix.
+
+### Tests Executed
+- `python tests/runtests.py auth_tests.test_middleware --settings=test_sqlite --verbosity=1`
+
+All relevant tests pass, and the behavior matches the requirements: sessions created with an old secret key remain valid as long as that key is in `SECRET_KEY_FALLBACKS`. The issue is resolved.
+--------------------------------------------------------------------------------
+
+TASK DESCRIPTION:
+--------------------------------------------------------------------------------
+@task.txt
+--------------------------------------------------------------------------------
+
+
+================================================================================
+Full trace: trace_20251030_220411_PASS.json
+================================================================================
