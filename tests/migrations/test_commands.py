@@ -2400,6 +2400,61 @@ class MakeMigrationsTests(MigrationTestBase):
         ):
             call_command("makemigrations", "--check", "migrations", verbosity=0)
 
+    def test_makemigrations_check_no_migrations_written(self):
+        """
+        makemigrations --check should not write migration files to disk.
+        """
+        # Use test_migrations which has existing migrations
+        with self.temporary_migration_module(
+            module="migrations.test_migrations"
+        ) as migration_dir:
+            # Get initial migration files
+            initial_files = sorted(
+                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
+            )
+            # Run makemigrations --check (should exit with status 1 because there are changes)
+            with self.assertRaises(SystemExit):
+                call_command("makemigrations", "--check", "migrations", verbosity=0)
+            # Verify no new migrations were written
+            final_files = sorted(
+                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
+            )
+            self.assertEqual(
+                initial_files,
+                final_files,
+                "makemigrations --check should not write migration files",
+            )
+
+    def test_makemigrations_check_empty_no_migrations_written(self):
+        """
+        makemigrations --check --empty should not write migration files to disk.
+        """
+        with self.temporary_migration_module(
+            module="migrations.test_migrations"
+        ) as migration_dir:
+            # Get initial migration files
+            initial_files = sorted(
+                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
+            )
+            # Run makemigrations --check --empty (should exit with status 1)
+            with self.assertRaises(SystemExit):
+                call_command(
+                    "makemigrations",
+                    "--check",
+                    "--empty",
+                    "migrations",
+                    verbosity=0,
+                )
+            # Verify no new migrations were written
+            final_files = sorted(
+                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
+            )
+            self.assertEqual(
+                initial_files,
+                final_files,
+                "makemigrations --check --empty should not write migration files",
+            )
+
     def test_makemigrations_migration_path_output(self):
         """
         makemigrations should print the relative paths to the migrations unless

@@ -1,0 +1,94 @@
+diff --git a/django/core/management/commands/makemigrations.py b/django/core/management/commands/makemigrations.py
+index 2e97d9064b..c8bb5b438b 100644
+--- a/django/core/management/commands/makemigrations.py
++++ b/django/core/management/commands/makemigrations.py
+@@ -223,6 +223,8 @@ class Command(BaseCommand):
+                 graph=loader.graph,
+                 migration_name=self.migration_name,
+             )
++            if check_changes:
++                sys.exit(1)
+             self.write_migration_files(changes)
+             return
+ 
+@@ -248,12 +250,12 @@ class Command(BaseCommand):
+                 else:
+                     self.log("No changes detected")
+         else:
++            if check_changes:
++                sys.exit(1)
+             if self.update:
+                 self.write_to_last_migration_files(changes)
+             else:
+                 self.write_migration_files(changes)
+-            if check_changes:
+-                sys.exit(1)
+ 
+     def write_to_last_migration_files(self, changes):
+         loader = MigrationLoader(connections[DEFAULT_DB_ALIAS])
+diff --git a/tests/migrations/test_commands.py b/tests/migrations/test_commands.py
+index 9900c7a35d..8a1b88dfb2 100644
+--- a/tests/migrations/test_commands.py
++++ b/tests/migrations/test_commands.py
+@@ -2400,6 +2400,61 @@ class MakeMigrationsTests(MigrationTestBase):
+         ):
+             call_command("makemigrations", "--check", "migrations", verbosity=0)
+ 
++    def test_makemigrations_check_no_migrations_written(self):
++        """
++        makemigrations --check should not write migration files to disk.
++        """
++        # Use test_migrations which has existing migrations
++        with self.temporary_migration_module(
++            module="migrations.test_migrations"
++        ) as migration_dir:
++            # Get initial migration files
++            initial_files = sorted(
++                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
++            )
++            # Run makemigrations --check (should exit with status 1 because there are changes)
++            with self.assertRaises(SystemExit):
++                call_command("makemigrations", "--check", "migrations", verbosity=0)
++            # Verify no new migrations were written
++            final_files = sorted(
++                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
++            )
++            self.assertEqual(
++                initial_files,
++                final_files,
++                "makemigrations --check should not write migration files",
++            )
++
++    def test_makemigrations_check_empty_no_migrations_written(self):
++        """
++        makemigrations --check --empty should not write migration files to disk.
++        """
++        with self.temporary_migration_module(
++            module="migrations.test_migrations"
++        ) as migration_dir:
++            # Get initial migration files
++            initial_files = sorted(
++                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
++            )
++            # Run makemigrations --check --empty (should exit with status 1)
++            with self.assertRaises(SystemExit):
++                call_command(
++                    "makemigrations",
++                    "--check",
++                    "--empty",
++                    "migrations",
++                    verbosity=0,
++                )
++            # Verify no new migrations were written
++            final_files = sorted(
++                [f for f in os.listdir(migration_dir) if f.endswith(".py")]
++            )
++            self.assertEqual(
++                initial_files,
++                final_files,
++                "makemigrations --check --empty should not write migration files",
++            )
++
+     def test_makemigrations_migration_path_output(self):
+         """
+         makemigrations should print the relative paths to the migrations unless
