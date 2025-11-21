@@ -822,6 +822,21 @@ class OptimizerTests(SimpleTestCase):
             ],
         )
 
+    def test_alter_field_alter_field(self):
+        """
+        Multiple AlterField operations on the same field should reduce to the last one.
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.AlterField("Foo", "age", models.IntegerField()),
+                migrations.AlterField("Foo", "age", models.FloatField()),
+                migrations.AlterField("Foo", "age", models.CharField(max_length=255)),
+            ],
+            [
+                migrations.AlterField("Foo", "age", models.CharField(max_length=255)),
+            ],
+        )
+
     def _test_create_alter_foo_field(self, alter):
         """
         CreateModel, AlterFooTogether/AlterOrderWithRespectTo followed by an
