@@ -1,0 +1,171 @@
+diff --git a/django/db/backends/base/schema.py b/django/db/backends/base/schema.py
+index 09785e8586..c52bc4f099 100644
+--- a/django/db/backends/base/schema.py
++++ b/django/db/backends/base/schema.py
+@@ -450,14 +450,20 @@ class BaseDatabaseSchemaEditor:
+ 
+         # Make M2M tables
+         for field in model._meta.local_many_to_many:
+-            if field.remote_field.through._meta.auto_created:
++            if (
++                not isinstance(field.remote_field.through, str)
++                and field.remote_field.through._meta.auto_created
++            ):
+                 self.create_model(field.remote_field.through)
+ 
+     def delete_model(self, model):
+         """Delete a model from the database."""
+         # Handle auto-created intermediary models
+         for field in model._meta.local_many_to_many:
+-            if field.remote_field.through._meta.auto_created:
++            if (
++                not isinstance(field.remote_field.through, str)
++                and field.remote_field.through._meta.auto_created
++            ):
+                 self.delete_model(field.remote_field.through)
+ 
+         # Delete the table
+@@ -630,7 +636,11 @@ class BaseDatabaseSchemaEditor:
+         involve adding a table instead (for M2M fields).
+         """
+         # Special-case implicit M2M tables
+-        if field.many_to_many and field.remote_field.through._meta.auto_created:
++        if (
++            field.many_to_many
++            and not isinstance(field.remote_field.through, str)
++            and field.remote_field.through._meta.auto_created
++        ):
+             return self.create_model(field.remote_field.through)
+         # Get the column's definition
+         definition, params = self.column_sql(model, field, include_default=True)
+@@ -704,7 +714,11 @@ class BaseDatabaseSchemaEditor:
+         but for M2Ms may involve deleting a table.
+         """
+         # Special-case implicit M2M tables
+-        if field.many_to_many and field.remote_field.through._meta.auto_created:
++        if (
++            field.many_to_many
++            and not isinstance(field.remote_field.through, str)
++            and field.remote_field.through._meta.auto_created
++        ):
+             return self.delete_model(field.remote_field.through)
+         # It might not actually have a column behind it
+         if field.db_parameters(connection=self.connection)["type"] is None:
+@@ -759,6 +773,8 @@ class BaseDatabaseSchemaEditor:
+             and (
+                 old_field.remote_field.through
+                 and new_field.remote_field.through
++                and not isinstance(old_field.remote_field.through, str)
++                and not isinstance(new_field.remote_field.through, str)
+                 and old_field.remote_field.through._meta.auto_created
+                 and new_field.remote_field.through._meta.auto_created
+             )
+@@ -770,6 +786,8 @@ class BaseDatabaseSchemaEditor:
+             and (
+                 old_field.remote_field.through
+                 and new_field.remote_field.through
++                and not isinstance(old_field.remote_field.through, str)
++                and not isinstance(new_field.remote_field.through, str)
+                 and not old_field.remote_field.through._meta.auto_created
+                 and not new_field.remote_field.through._meta.auto_created
+             )
+diff --git a/tests/migrations/test_operations.py b/tests/migrations/test_operations.py
+index f2edf6ac73..9580b089e4 100644
+--- a/tests/migrations/test_operations.py
++++ b/tests/migrations/test_operations.py
+@@ -5231,6 +5231,95 @@ class OperationTests(OperationTestBase):
+             operation.database_backwards(app_label, editor, new_state, project_state)
+         assertModelsAndTables(after_db=False)
+ 
++    def test_create_model_with_m2m_through_in_separate_app(self):
++        """
++        Test that creating a model with a ManyToManyField that has a through
++        model defined in a separate app works correctly.
++        Regression test for #15973.
++        """
++        app_label = "test_m2m_through_separate"
++        project_state = ProjectState()
++        
++        # Create both models first
++        project_state = self.apply_operations(
++            app_label,
++            project_state,
++            operations=[
++                migrations.CreateModel(
++                    "VariavelModel",
++                    fields=[
++                        ("id", models.AutoField(primary_key=True)),
++                        ("nome", models.TextField(unique=True)),
++                    ],
++                ),
++                migrations.CreateModel(
++                    "FonteModel",
++                    fields=[
++                        ("id", models.AutoField(primary_key=True)),
++                        ("nome", models.TextField(unique=True)),
++                    ],
++                ),
++            ],
++        )
++        
++        # Create the through model
++        project_state = self.apply_operations(
++            app_label,
++            project_state,
++            operations=[
++                migrations.CreateModel(
++                    "FonteVariavelModel",
++                    fields=[
++                        ("id", models.AutoField(primary_key=True)),
++                        (
++                            "variavel",
++                            models.ForeignKey(
++                                f"{app_label}.VariavelModel", models.CASCADE
++                            ),
++                        ),
++                        (
++                            "fonte",
++                            models.ForeignKey(
++                                f"{app_label}.FonteModel", models.CASCADE
++                            ),
++                        ),
++                    ],
++                ),
++            ],
++        )
++        
++        # Add the M2M field pointing to the through model
++        # This should not raise AttributeError: 'str' object has no attribute '_meta'
++        project_state = self.apply_operations(
++            app_label,
++            project_state,
++            operations=[
++                migrations.AddField(
++                    "FonteModel",
++                    "variaveis",
++                    models.ManyToManyField(
++                        f"{app_label}.VariavelModel",
++                        through=f"{app_label}.FonteVariavelModel",
++                    ),
++                ),
++            ],
++        )
++        
++        # Verify the models were created correctly
++        FonteModel = project_state.apps.get_model(app_label, "FonteModel")
++        VariavelModel = project_state.apps.get_model(app_label, "VariavelModel")
++        FonteVariavelModel = project_state.apps.get_model(
++            app_label, "FonteVariavelModel"
++        )
++        
++        # Create some test data
++        variavel = VariavelModel.objects.create(nome="test_variavel")
++        fonte = FonteModel.objects.create(nome="test_fonte")
++        FonteVariavelModel.objects.create(variavel=variavel, fonte=fonte)
++        
++        # Verify the relationship works
++        self.assertEqual(FonteVariavelModel.objects.count(), 1)
++
+ 
+ class SwappableOperationTests(OperationTestBase):
+     """

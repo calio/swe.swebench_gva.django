@@ -5231,6 +5231,95 @@ class OperationTests(OperationTestBase):
             operation.database_backwards(app_label, editor, new_state, project_state)
         assertModelsAndTables(after_db=False)
 
+    def test_create_model_with_m2m_through_in_separate_app(self):
+        """
+        Test that creating a model with a ManyToManyField that has a through
+        model defined in a separate app works correctly.
+        Regression test for #15973.
+        """
+        app_label = "test_m2m_through_separate"
+        project_state = ProjectState()
+        
+        # Create both models first
+        project_state = self.apply_operations(
+            app_label,
+            project_state,
+            operations=[
+                migrations.CreateModel(
+                    "VariavelModel",
+                    fields=[
+                        ("id", models.AutoField(primary_key=True)),
+                        ("nome", models.TextField(unique=True)),
+                    ],
+                ),
+                migrations.CreateModel(
+                    "FonteModel",
+                    fields=[
+                        ("id", models.AutoField(primary_key=True)),
+                        ("nome", models.TextField(unique=True)),
+                    ],
+                ),
+            ],
+        )
+        
+        # Create the through model
+        project_state = self.apply_operations(
+            app_label,
+            project_state,
+            operations=[
+                migrations.CreateModel(
+                    "FonteVariavelModel",
+                    fields=[
+                        ("id", models.AutoField(primary_key=True)),
+                        (
+                            "variavel",
+                            models.ForeignKey(
+                                f"{app_label}.VariavelModel", models.CASCADE
+                            ),
+                        ),
+                        (
+                            "fonte",
+                            models.ForeignKey(
+                                f"{app_label}.FonteModel", models.CASCADE
+                            ),
+                        ),
+                    ],
+                ),
+            ],
+        )
+        
+        # Add the M2M field pointing to the through model
+        # This should not raise AttributeError: 'str' object has no attribute '_meta'
+        project_state = self.apply_operations(
+            app_label,
+            project_state,
+            operations=[
+                migrations.AddField(
+                    "FonteModel",
+                    "variaveis",
+                    models.ManyToManyField(
+                        f"{app_label}.VariavelModel",
+                        through=f"{app_label}.FonteVariavelModel",
+                    ),
+                ),
+            ],
+        )
+        
+        # Verify the models were created correctly
+        FonteModel = project_state.apps.get_model(app_label, "FonteModel")
+        VariavelModel = project_state.apps.get_model(app_label, "VariavelModel")
+        FonteVariavelModel = project_state.apps.get_model(
+            app_label, "FonteVariavelModel"
+        )
+        
+        # Create some test data
+        variavel = VariavelModel.objects.create(nome="test_variavel")
+        fonte = FonteModel.objects.create(nome="test_fonte")
+        FonteVariavelModel.objects.create(variavel=variavel, fonte=fonte)
+        
+        # Verify the relationship works
+        self.assertEqual(FonteVariavelModel.objects.count(), 1)
+
 
 class SwappableOperationTests(OperationTestBase):
     """
