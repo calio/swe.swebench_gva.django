@@ -1,3 +1,5 @@
+import copy
+
 from django.forms import ChoiceField, Field, Form, Select
 from django.test import SimpleTestCase
 
@@ -34,6 +36,46 @@ class BasicFieldsTests(SimpleTestCase):
         f.fields['field2'].choices = [('2', '2')]
         self.assertEqual(f.fields['field1'].widget.choices, [('1', '1')])
         self.assertEqual(f.fields['field2'].widget.choices, [('2', '2')])
+
+    def test_field_deepcopies_error_messages(self):
+        """Test that deepcopy creates independent error_messages dictionaries."""
+        field1 = Field(error_messages={'required': 'Custom required message'})
+        field2 = copy.deepcopy(field1)
+        
+        # Modify error_messages in field2
+        field2.error_messages['required'] = 'Modified message'
+        
+        # field1's error_messages should not be affected
+        self.assertEqual(field1.error_messages['required'], 'Custom required message')
+        self.assertEqual(field2.error_messages['required'], 'Modified message')
+        
+        # Verify they are different dictionaries
+        self.assertIsNot(field1.error_messages, field2.error_messages)
+
+    def test_form_field_instances_have_independent_error_messages(self):
+        """
+        Test that form instances have independent error_messages for their fields.
+        This is the real-world scenario described in the issue.
+        """
+        class TestForm(Form):
+            name = Field()
+
+        # Create two form instances
+        form1 = TestForm()
+        form2 = TestForm()
+        
+        # Modify error_messages in form1
+        form1.fields['name'].error_messages['required'] = 'Form1 required'
+        
+        # form2's error_messages should not be affected
+        self.assertNotEqual(
+            form2.fields['name'].error_messages['required'],
+            'Form1 required'
+        )
+        self.assertEqual(
+            form1.fields['name'].error_messages['required'],
+            'Form1 required'
+        )
 
 
 class DisabledFieldTests(SimpleTestCase):
