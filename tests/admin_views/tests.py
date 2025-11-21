@@ -1512,6 +1512,44 @@ class CustomModelAdminTest(AdminViewBasicTestCase):
         response = self.client.get(reverse('admin4:auth_user_password_change', args=(su.pk,)))
         self.assertEqual(response.status_code, 200)
 
+    def test_readonly_foreignkey_links_custom_admin_site(self):
+        """
+        ForeignKey readonly fields render as links with the correct admin site
+        namespace when using a custom admin site.
+        """
+        self.client.force_login(self.superuser)
+        chapter = Chapter.objects.create(
+            title='Chapter 1',
+            content='content',
+            book=Book.objects.create(name='Book 1'),
+        )
+        language = Language.objects.create(iso='_40', name='Test')
+        obj = ReadOnlyRelatedField.objects.create(
+            chapter=chapter,
+            language=language,
+            user=self.superuser,
+        )
+        response = self.client.get(
+            reverse('admin2:admin_views_readonlyrelatedfield_change', args=(obj.pk,)),
+        )
+        # Related ForeignKey object registered in admin2 (custom admin site).
+        user_url = reverse('admin2:auth_user_change', args=(self.superuser.pk,))
+        self.assertContains(
+            response,
+            '<div class="readonly"><a href="%s">super</a></div>' % user_url,
+            html=True,
+        )
+        # Related ForeignKey with the string primary key registered in admin2.
+        language_url = reverse(
+            'admin2:admin_views_language_change',
+            args=(quote(language.pk),),
+        )
+        self.assertContains(
+            response,
+            '<div class="readonly"><a href="%s">_40</a></div>' % language_url,
+            html=True,
+        )
+
 
 def get_perm(Model, codename):
     """Return the permission object, for the Model"""

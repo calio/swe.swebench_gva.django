@@ -62,6 +62,8 @@ site.register(models.ChapterXtra1, base_admin.ChapterXtra1Admin)
 site.register(User, UserLimitedAdmin)
 site.register(models.UndeletableObject, base_admin.UndeletableObjectAdmin)
 site.register(models.Simple, base_admin.AttributeErrorRaisingAdmin)
+site.register(models.ReadOnlyRelatedField, base_admin.ReadOnlyRelatedFieldAdmin)
+site.register(models.Language, base_admin.LanguageAdmin)
 
 simple_site = Admin2(name='admin4')
 simple_site.register(User, CustomPwdTemplateUserAdmin)
