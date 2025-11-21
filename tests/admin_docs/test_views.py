@@ -354,6 +354,8 @@ class AdminDocViewFunctionsTests(SimpleTestCase):
             (r'^(?P<a>(x|y))/b/(?P<c>\w+)ab', '/<a>/b/<c>ab'),
             (r'^(?P<a>(x|y)(\(|\)))/b/(?P<c>\w+)ab', '/<a>/b/<c>ab'),
             (r'^a/?$', '/a/'),
+            # Test for issue: trailing named groups without trailing slash
+            (r'entries/(?P<pk>[^/.]+)/relationships/(?P<related_field>\w+)', '/entries/<pk>/relationships/<related_field>'),
         )
         for pattern, output in tests:
             with self.subTest(pattern=pattern):
