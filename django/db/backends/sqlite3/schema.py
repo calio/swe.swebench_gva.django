@@ -3,7 +3,11 @@ from decimal import Decimal
 
 from django.apps.registry import Apps
 from django.db import NotSupportedError
-from django.db.backends.base.schema import BaseDatabaseSchemaEditor
+from django.db.backends.base.schema import (
+    BaseDatabaseSchemaEditor,
+    _all_related_fields,
+    _is_relevant_relation,
+)
 from django.db.backends.ddl_references import Statement
 from django.db.backends.utils import strip_quotes
 from django.db.models import UniqueConstraint
@@ -452,30 +456,55 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     model._meta.db_table, old_field, new_field, new_type
                 )
             )
+        # Check if collation has changed
+        old_collation = old_db_params.get("collation")
+        new_collation = new_db_params.get("collation")
+        collation_changed = old_collation != new_collation
+        
+        # Find related models BEFORE remaking the table
+        related_models = set()
+        print(f"DEBUG: new_field.unique={new_field.unique}, old_type={old_type}, new_type={new_type}, collation_changed={collation_changed}")
+        if new_field.unique and (old_type != new_type or collation_changed):
+            # Get all related fields that reference this field
+            # Try using _all_related_fields first
+            for relation in _all_related_fields(model):
+                if _is_relevant_relation(relation, new_field):
+                    related_models.add(relation.related_model)
+            # If no related models found, try using model._meta.related_objects
+            # This is needed when models are in a different app registry
+            if not related_models:
+                for relation in model._meta.related_objects:
+                    if not relation.many_to_many:
+                        if relation.field_name == new_field.name or (
+                            new_field.primary_key and relation.field.to_fields == [None]
+                        ):
+                            related_models.add(relation.related_model)
+            # If still no related models found, manually search through all models
+            # in the app registry for foreign keys to this model
+            if not related_models:
+                try:
+                    for app_model in model._meta.apps.get_models():
+                        for field in app_model._meta.get_fields():
+                            if (
+                                hasattr(field, "remote_field")
+                                and field.remote_field
+                                and field.remote_field.model == model
+                                and not field.many_to_many
+                            ):
+                                if field.name == new_field.name or (
+                                    new_field.primary_key and field.to_fields == [None]
+                                ):
+                                    related_models.add(app_model)
+                except Exception:
+                    # If we can't find related models, just continue
+                    pass
+        
         # Alter by remaking table
         self._remake_table(model, alter_field=(old_field, new_field))
+        
         # Rebuild tables with FKs pointing to this field.
-        if new_field.unique and old_type != new_type:
-            related_models = set()
-            opts = new_field.model._meta
-            for remote_field in opts.related_objects:
-                # Ignore self-relationship since the table was already rebuilt.
-                if remote_field.related_model == model:
-                    continue
-                if not remote_field.many_to_many:
-                    if remote_field.field_name == new_field.name:
-                        related_models.add(remote_field.related_model)
-                elif new_field.primary_key and remote_field.through._meta.auto_created:
-                    related_models.add(remote_field.through)
-            if new_field.primary_key:
-                for many_to_many in opts.many_to_many:
-                    # Ignore self-relationship since the table was already rebuilt.
-                    if many_to_many.related_model == model:
-                        continue
-                    if many_to_many.remote_field.through._meta.auto_created:
-                        related_models.add(many_to_many.remote_field.through)
-            for related_model in related_models:
-                self._remake_table(related_model)
+        for related_model in related_models:
+            self._remake_table(related_model)
 
     def _alter_many_to_many(self, model, old_field, new_field, strict):
         """Alter M2Ms to repoint their to= endpoints."""

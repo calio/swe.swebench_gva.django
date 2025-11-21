@@ -233,3 +233,28 @@ class Node(models.Model):
 
     class Meta:
         apps = new_apps
+
+
+class AccountWithCollation(models.Model):
+    id = models.CharField(max_length=22, primary_key=True)
+
+    class Meta:
+        apps = new_apps
+
+
+class AddressWithCollation(models.Model):
+    id = models.CharField(max_length=22, primary_key=True)
+    account = models.OneToOneField(AccountWithCollation, on_delete=models.CASCADE)
+
+    class Meta:
+        apps = new_apps
+
+
+class ProfileWithCollation(models.Model):
+    id = models.CharField(max_length=22, primary_key=True)
+    account = models.ForeignKey(
+        AccountWithCollation, null=True, blank=True, on_delete=models.CASCADE
+    )
+
+    class Meta:
+        apps = new_apps

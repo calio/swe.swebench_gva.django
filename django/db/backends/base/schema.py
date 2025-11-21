@@ -1038,9 +1038,20 @@ class BaseDatabaseSchemaEditor:
         for old_rel, new_rel in rels_to_update:
             rel_db_params = new_rel.field.db_parameters(connection=self.connection)
             rel_type = rel_db_params["type"]
-            fragment, other_actions = self._alter_column_type_sql(
-                new_rel.related_model, old_rel.field, new_rel.field, rel_type
-            )
+            # Check if collation has changed
+            old_rel_db_params = old_rel.field.db_parameters(connection=self.connection)
+            old_rel_collation = old_rel_db_params.get("collation")
+            new_rel_collation = rel_db_params.get("collation")
+            other_actions = []
+            if old_rel_collation != new_rel_collation:
+                # Collation change handles also a type change.
+                fragment = self._alter_column_collation_sql(
+                    new_rel.related_model, new_rel.field, rel_type, new_rel_collation
+                )
+            else:
+                fragment, other_actions = self._alter_column_type_sql(
+                    new_rel.related_model, old_rel.field, new_rel.field, rel_type
+                )
             self.execute(
                 self.sql_alter_column
                 % {

@@ -4704,3 +4704,52 @@ class SchemaTests(TransactionTestCase):
             if connection.vendor == "postgresql":
                 with connection.cursor() as cursor:
                     cursor.execute("DROP COLLATION IF EXISTS case_insensitive")
+
+    @skipUnlessDBFeature("supports_collation_on_charfield")
+    def test_alter_primary_key_collation_with_foreign_keys(self):
+        """
+        Test that when altering a primary key to add collation, the collation
+        is also propagated to foreign key columns that reference it.
+        Regression test for #33671.
+        """
+        from .models import (
+            AccountWithCollation,
+            AddressWithCollation,
+            ProfileWithCollation,
+        )
+
+        collation = connection.features.test_collations.get("non_default")
+        if not collation:
+            self.skipTest("Language collations are not supported.")
+
+        # Create the models
+        with connection.schema_editor() as editor:
+            editor.create_model(AccountWithCollation)
+            editor.create_model(AddressWithCollation)
+            editor.create_model(ProfileWithCollation)
+
+        # Alter the primary key to add collation
+        old_field = AccountWithCollation._meta.get_field("id")
+        new_field = CharField(max_length=22, primary_key=True, db_collation=collation)
+        new_field.set_attributes_from_name("id")
+        new_field.model = AccountWithCollation
+
+        # This should not raise an IntegrityError about collation mismatch
+        with connection.schema_editor() as editor:
+            editor.alter_field(AccountWithCollation, old_field, new_field, strict=True)
+
+        # Verify the primary key has the collation
+        self.assertEqual(
+            self.get_column_collation(AccountWithCollation._meta.db_table, "id"),
+            collation,
+        )
+
+        # Verify the foreign key columns also have the collation
+        self.assertEqual(
+            self.get_column_collation(AddressWithCollation._meta.db_table, "account_id"),
+            collation,
+        )
+        self.assertEqual(
+            self.get_column_collation(ProfileWithCollation._meta.db_table, "account_id"),
+            collation,
+        )
