@@ -1777,6 +1777,7 @@ class Query(BaseExpression):
 
     def set_empty(self):
         self.where.add(NothingNode(), AND)
+        self.combined_queries = ()
 
     def is_empty(self):
         return any(isinstance(c, NothingNode) for c in self.where.children)

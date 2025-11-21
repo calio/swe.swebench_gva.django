@@ -1,0 +1,81 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index c913267476..3f869e4eb2 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1777,6 +1777,7 @@ class Query(BaseExpression):
+ 
+     def set_empty(self):
+         self.where.add(NothingNode(), AND)
++        self.combined_queries = ()
+ 
+     def is_empty(self):
+         return any(isinstance(c, NothingNode) for c in self.where.children)
+diff --git a/tests/model_forms/test_modelchoicefield.py b/tests/model_forms/test_modelchoicefield.py
+index 8f41ce9c40..11ef87ba68 100644
+--- a/tests/model_forms/test_modelchoicefield.py
++++ b/tests/model_forms/test_modelchoicefield.py
+@@ -373,3 +373,29 @@ class ModelChoiceFieldTests(TestCase):
+         )
+         with self.assertNumQueries(2):
+             template.render(Context({'form': CategoriesForm()}))
++
++    def test_modelchoicefield_with_union_queryset(self):
++        """
++        Test that .none() on a union queryset correctly returns an empty result.
++        This is important for ModelMultipleChoiceField which calls .none() when
++        the field is not required and no value is provided.
++        """
++        # Create categories with specific IDs for testing
++        c1 = Category.objects.create(name='Cat1', slug='cat1', url='cat1')
++        c2 = Category.objects.create(name='Cat2', slug='cat2', url='cat2')
++        c3 = Category.objects.create(name='Cat3', slug='cat3', url='cat3')
++        c4 = Category.objects.create(name='Cat4', slug='cat4', url='cat4')
++        c5 = Category.objects.create(name='Cat5', slug='cat5', url='cat5')
++
++        # Create a union queryset
++        union_qs = Category.objects.filter(id__in=[c1.id, c2.id]).union(
++            Category.objects.filter(id__in=[c4.id, c5.id])
++        )
++
++        # Test that the union queryset has the expected items
++        self.assertEqual(set(union_qs.values_list('id', flat=True)), {c1.id, c2.id, c4.id, c5.id})
++
++        # Test that .none() on the union queryset returns an empty result
++        none_qs = union_qs.none()
++        self.assertEqual(none_qs.count(), 0)
++        self.assertEqual(list(none_qs), [])
+diff --git a/tests/queries/test_qs_combinators.py b/tests/queries/test_qs_combinators.py
+index 9c6fd474ca..57d4a75a0d 100644
+--- a/tests/queries/test_qs_combinators.py
++++ b/tests/queries/test_qs_combinators.py
+@@ -99,6 +99,30 @@ class QuerySetSetOperationTests(TestCase):
+         self.assertEqual(len(qs2.union(qs2)), 0)
+         self.assertEqual(len(qs3.union(qs3)), 0)
+ 
++    def test_none_on_combined_queries(self):
++        # Test that .none() on combined queries returns empty result set
++        qs1 = Number.objects.filter(num__lt=2)
++        qs2 = Number.objects.filter(num__gt=5)
++        
++        # Test union
++        union_qs = qs1.union(qs2)
++        self.assertEqual(len(union_qs), 6)  # 0, 1, 6, 7, 8, 9
++        self.assertEqual(len(union_qs.none()), 0)
++        
++        # Test intersection
++        qs3 = Number.objects.filter(num__lte=5)
++        qs4 = Number.objects.filter(num__gte=5)
++        intersection_qs = qs3.intersection(qs4)
++        self.assertEqual(len(intersection_qs), 1)  # 5
++        self.assertEqual(len(intersection_qs.none()), 0)
++        
++        # Test difference
++        qs5 = Number.objects.filter(num__lte=5)
++        qs6 = Number.objects.filter(num__lte=4)
++        difference_qs = qs5.difference(qs6)
++        self.assertEqual(len(difference_qs), 1)  # 5
++        self.assertEqual(len(difference_qs.none()), 0)
++
+     def test_limits(self):
+         qs1 = Number.objects.all()
+         qs2 = Number.objects.all()

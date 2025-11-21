@@ -373,3 +373,29 @@ class ModelChoiceFieldTests(TestCase):
         )
         with self.assertNumQueries(2):
             template.render(Context({'form': CategoriesForm()}))
+
+    def test_modelchoicefield_with_union_queryset(self):
+        """
+        Test that .none() on a union queryset correctly returns an empty result.
+        This is important for ModelMultipleChoiceField which calls .none() when
+        the field is not required and no value is provided.
+        """
+        # Create categories with specific IDs for testing
+        c1 = Category.objects.create(name='Cat1', slug='cat1', url='cat1')
+        c2 = Category.objects.create(name='Cat2', slug='cat2', url='cat2')
+        c3 = Category.objects.create(name='Cat3', slug='cat3', url='cat3')
+        c4 = Category.objects.create(name='Cat4', slug='cat4', url='cat4')
+        c5 = Category.objects.create(name='Cat5', slug='cat5', url='cat5')
+
+        # Create a union queryset
+        union_qs = Category.objects.filter(id__in=[c1.id, c2.id]).union(
+            Category.objects.filter(id__in=[c4.id, c5.id])
+        )
+
+        # Test that the union queryset has the expected items
+        self.assertEqual(set(union_qs.values_list('id', flat=True)), {c1.id, c2.id, c4.id, c5.id})
+
+        # Test that .none() on the union queryset returns an empty result
+        none_qs = union_qs.none()
+        self.assertEqual(none_qs.count(), 0)
+        self.assertEqual(list(none_qs), [])

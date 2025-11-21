@@ -99,6 +99,30 @@ class QuerySetSetOperationTests(TestCase):
         self.assertEqual(len(qs2.union(qs2)), 0)
         self.assertEqual(len(qs3.union(qs3)), 0)
 
+    def test_none_on_combined_queries(self):
+        # Test that .none() on combined queries returns empty result set
+        qs1 = Number.objects.filter(num__lt=2)
+        qs2 = Number.objects.filter(num__gt=5)
+        
+        # Test union
+        union_qs = qs1.union(qs2)
+        self.assertEqual(len(union_qs), 6)  # 0, 1, 6, 7, 8, 9
+        self.assertEqual(len(union_qs.none()), 0)
+        
+        # Test intersection
+        qs3 = Number.objects.filter(num__lte=5)
+        qs4 = Number.objects.filter(num__gte=5)
+        intersection_qs = qs3.intersection(qs4)
+        self.assertEqual(len(intersection_qs), 1)  # 5
+        self.assertEqual(len(intersection_qs.none()), 0)
+        
+        # Test difference
+        qs5 = Number.objects.filter(num__lte=5)
+        qs6 = Number.objects.filter(num__lte=4)
+        difference_qs = qs5.difference(qs6)
+        self.assertEqual(len(difference_qs), 1)  # 5
+        self.assertEqual(len(difference_qs.none()), 0)
+
     def test_limits(self):
         qs1 = Number.objects.all()
         qs2 = Number.objects.all()
