@@ -232,9 +232,19 @@ class Collector:
         """
         Get a QuerySet of objects related to `objs` via the relation `related`.
         """
-        return related.related_model._base_manager.using(self.using).filter(
+        qs = related.related_model._base_manager.using(self.using).filter(
             **{"%s__in" % related.field.name: objs}
         )
+        # Optimize to only fetch the primary key and foreign key fields.
+        # This avoids fetching large text fields that may contain invalid
+        # unicode data, while still allowing access to fields needed by
+        # signal handlers and other code.
+        fields_to_fetch = [related.related_model._meta.pk.name]
+        # Include all foreign key fields to support signal handlers
+        for field in related.related_model._meta.get_fields():
+            if field.many_to_one and not field.auto_created:
+                fields_to_fetch.append(field.name)
+        return qs.only(*fields_to_fetch)
 
     def instances_with_model(self):
         for model, instances in self.data.items():

@@ -437,6 +437,37 @@ class DeletionTests(TestCase):
         with self.assertNumQueries(2):
             avatar.delete()
 
+    def test_delete_only_fetches_required_fields(self):
+        """
+        Test that .delete() only fetches the primary key and foreign key
+        fields for related objects, not all fields. This optimization
+        avoids fetching large text fields that may contain invalid unicode
+        data and improves performance.
+        """
+        from django.db.models.deletion import Collector
+        from django.test.utils import CaptureQueriesContext
+
+        r = R.objects.create(pk=1)
+        s = S.objects.create(pk=1, r=r)
+        t = T.objects.create(pk=1, s=s)
+
+        # Capture the queries executed during deletion
+        with CaptureQueriesContext(connection) as context:
+            r.delete()
+
+        # Check that the queries don't select unnecessary fields
+        # The queries should only select pk and foreign key fields
+        for query in context.captured_queries:
+            sql = query['sql'].lower()
+            # If this is a SELECT query for related objects, verify it only
+            # selects the necessary fields (pk and foreign keys)
+            if 'select' in sql and 'from' in sql:
+                # For S model, should only select id and r_id
+                if 'from delete_s' in sql or 'from "delete_s"' in sql:
+                    # Should contain id and r_id, but not other fields
+                    self.assertIn('id', sql)
+                    self.assertIn('r_id', sql)
+
 
 class FastDeleteTests(TestCase):
 

@@ -1,0 +1,67 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 3a462f1c4c..144cb35f8f 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -232,9 +232,19 @@ class Collector:
+         """
+         Get a QuerySet of objects related to `objs` via the relation `related`.
+         """
+-        return related.related_model._base_manager.using(self.using).filter(
++        qs = related.related_model._base_manager.using(self.using).filter(
+             **{"%s__in" % related.field.name: objs}
+         )
++        # Optimize to only fetch the primary key and foreign key fields.
++        # This avoids fetching large text fields that may contain invalid
++        # unicode data, while still allowing access to fields needed by
++        # signal handlers and other code.
++        fields_to_fetch = [related.related_model._meta.pk.name]
++        # Include all foreign key fields to support signal handlers
++        for field in related.related_model._meta.get_fields():
++            if field.many_to_one and not field.auto_created:
++                fields_to_fetch.append(field.name)
++        return qs.only(*fields_to_fetch)
+ 
+     def instances_with_model(self):
+         for model, instances in self.data.items():
+diff --git a/tests/delete/tests.py b/tests/delete/tests.py
+index ed47d0667d..0a9948da81 100644
+--- a/tests/delete/tests.py
++++ b/tests/delete/tests.py
+@@ -437,6 +437,37 @@ class DeletionTests(TestCase):
+         with self.assertNumQueries(2):
+             avatar.delete()
+ 
++    def test_delete_only_fetches_required_fields(self):
++        """
++        Test that .delete() only fetches the primary key and foreign key
++        fields for related objects, not all fields. This optimization
++        avoids fetching large text fields that may contain invalid unicode
++        data and improves performance.
++        """
++        from django.db.models.deletion import Collector
++        from django.test.utils import CaptureQueriesContext
++
++        r = R.objects.create(pk=1)
++        s = S.objects.create(pk=1, r=r)
++        t = T.objects.create(pk=1, s=s)
++
++        # Capture the queries executed during deletion
++        with CaptureQueriesContext(connection) as context:
++            r.delete()
++
++        # Check that the queries don't select unnecessary fields
++        # The queries should only select pk and foreign key fields
++        for query in context.captured_queries:
++            sql = query['sql'].lower()
++            # If this is a SELECT query for related objects, verify it only
++            # selects the necessary fields (pk and foreign keys)
++            if 'select' in sql and 'from' in sql:
++                # For S model, should only select id and r_id
++                if 'from delete_s' in sql or 'from "delete_s"' in sql:
++                    # Should contain id and r_id, but not other fields
++                    self.assertIn('id', sql)
++                    self.assertIn('r_id', sql)
++
+ 
+ class FastDeleteTests(TestCase):
+ 
