@@ -226,6 +226,46 @@ class BaseModelBackendTest:
         authenticate(username='no_such_user', password='test')
         self.assertEqual(CountingMD5PasswordHasher.calls, 1)
 
+    def test_authenticate_with_none_credentials(self):
+        """
+        Authenticate with None username and password should not make
+        a database query or run the password hasher.
+        """
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+
+        with CaptureQueriesContext(connection) as ctx:
+            result = authenticate(username=None, password=None)
+            self.assertIsNone(result)
+            # Should not make any database queries
+            self.assertEqual(len(ctx), 0, f"Expected 0 queries but got {len(ctx)}: {[q['sql'] for q in ctx]}")
+
+    def test_authenticate_with_none_username(self):
+        """
+        Authenticate with None username should not make a database query.
+        """
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+
+        with CaptureQueriesContext(connection) as ctx:
+            result = authenticate(username=None, password='test')
+            self.assertIsNone(result)
+            # Should not make any database queries
+            self.assertEqual(len(ctx), 0, f"Expected 0 queries but got {len(ctx)}: {[q['sql'] for q in ctx]}")
+
+    def test_authenticate_with_none_password(self):
+        """
+        Authenticate with None password should not make a database query.
+        """
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+
+        with CaptureQueriesContext(connection) as ctx:
+            result = authenticate(username='test', password=None)
+            self.assertIsNone(result)
+            # Should not make any database queries
+            self.assertEqual(len(ctx), 0, f"Expected 0 queries but got {len(ctx)}: {[q['sql'] for q in ctx]}")
+
 
 class ModelBackendTest(BaseModelBackendTest, TestCase):
     """
