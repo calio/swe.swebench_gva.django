@@ -112,9 +112,14 @@ class IndexColumns(Columns):
         def col_str(column, idx):
             # Index.__init__() guarantees that self.opclasses is the same
             # length as self.columns.
-            col = '{} {}'.format(self.quote_name(column), self.opclasses[idx])
+            col = self.quote_name(column)
+            # Add opclass if present
+            if self.opclasses[idx]:
+                col = '{} {}'.format(col, self.opclasses[idx])
+            # Add ordering suffix if present
             try:
-                col = '{} {}'.format(col, self.col_suffixes[idx])
+                if self.col_suffixes[idx]:
+                    col = '{} {}'.format(col, self.col_suffixes[idx])
             except IndexError:
                 pass
             return col
