@@ -861,6 +861,15 @@ class AddIndex(IndexOperation):
     def migration_name_fragment(self):
         return "%s_%s" % (self.model_name_lower, self.index.name.lower())
 
+    def reduce(self, operation, app_label):
+        if (
+            isinstance(operation, RemoveIndex)
+            and self.model_name_lower == operation.model_name_lower
+            and self.index.name.lower() == operation.name.lower()
+        ):
+            return []
+        return super().reduce(operation, app_label)
+
 
 class RemoveIndex(IndexOperation):
     """Remove an index from a model."""
@@ -903,6 +912,15 @@ class RemoveIndex(IndexOperation):
     @property
     def migration_name_fragment(self):
         return "remove_%s_%s" % (self.model_name_lower, self.name.lower())
+
+    def reduce(self, operation, app_label):
+        if (
+            isinstance(operation, AddIndex)
+            and self.model_name_lower == operation.model_name_lower
+            and self.name.lower() == operation.index.name.lower()
+        ):
+            return []
+        return super().reduce(operation, app_label)
 
 
 class RenameIndex(IndexOperation):

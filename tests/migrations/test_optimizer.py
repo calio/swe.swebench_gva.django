@@ -1158,3 +1158,76 @@ class OptimizerTests(SimpleTestCase):
                 ),
             ]
         )
+
+    def test_add_remove_index(self):
+        """
+        AddIndex and RemoveIndex on the same index should cancel out.
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.AddIndex(
+                    "Pony",
+                    models.Index(fields=["weight"], name="pony_weight_idx"),
+                ),
+                migrations.RemoveIndex("Pony", "pony_weight_idx"),
+            ],
+            [],
+        )
+
+    def test_remove_add_index(self):
+        """
+        RemoveIndex and AddIndex on the same index should cancel out.
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.RemoveIndex("Pony", "pony_weight_idx"),
+                migrations.AddIndex(
+                    "Pony",
+                    models.Index(fields=["weight"], name="pony_weight_idx"),
+                ),
+            ],
+            [],
+        )
+
+    def test_add_remove_index_different_indexes(self):
+        """
+        AddIndex and RemoveIndex on different indexes should not optimize.
+        """
+        self.assertDoesNotOptimize(
+            [
+                migrations.AddIndex(
+                    "Pony",
+                    models.Index(fields=["weight"], name="pony_weight_idx"),
+                ),
+                migrations.RemoveIndex("Pony", "pony_height_idx"),
+            ]
+        )
+
+    def test_add_remove_index_different_models(self):
+        """
+        AddIndex and RemoveIndex on different models should not optimize.
+        """
+        self.assertDoesNotOptimize(
+            [
+                migrations.AddIndex(
+                    "Pony",
+                    models.Index(fields=["weight"], name="pony_weight_idx"),
+                ),
+                migrations.RemoveIndex("Horse", "pony_weight_idx"),
+            ]
+        )
+
+    def test_add_remove_index_case_insensitive(self):
+        """
+        AddIndex and RemoveIndex should match index names case-insensitively.
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.AddIndex(
+                    "Pony",
+                    models.Index(fields=["weight"], name="Pony_Weight_Idx"),
+                ),
+                migrations.RemoveIndex("Pony", "pony_weight_idx"),
+            ],
+            [],
+        )
