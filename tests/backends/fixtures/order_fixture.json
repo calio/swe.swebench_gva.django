@@ -1,0 +1,18 @@
+[
+  {
+    "model": "backends.reporter",
+    "pk": 1,
+    "fields": {
+      "first_name": "John",
+      "last_name": "Doe"
+    }
+  },
+  {
+    "model": "backends.order",
+    "pk": 1,
+    "fields": {
+      "name": "Test Order",
+      "reporter": 1
+    }
+  }
+]

@@ -1,0 +1,107 @@
+diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py
+index 2eeaf98c0d..d23822c641 100644
+--- a/django/db/backends/sqlite3/base.py
++++ b/django/db/backends/sqlite3/base.py
+@@ -327,19 +327,19 @@ class DatabaseWrapper(BaseDatabaseWrapper):
+                     violations = cursor.execute('PRAGMA foreign_key_check').fetchall()
+                 else:
+                     violations = chain.from_iterable(
+-                        cursor.execute('PRAGMA foreign_key_check(%s)' % table_name).fetchall()
++                        cursor.execute('PRAGMA foreign_key_check(%s)' % self.ops.quote_name(table_name)).fetchall()
+                         for table_name in table_names
+                     )
+                 # See https://www.sqlite.org/pragma.html#pragma_foreign_key_check
+                 for table_name, rowid, referenced_table_name, foreign_key_index in violations:
+                     foreign_key = cursor.execute(
+-                        'PRAGMA foreign_key_list(%s)' % table_name
++                        'PRAGMA foreign_key_list(%s)' % self.ops.quote_name(table_name)
+                     ).fetchall()[foreign_key_index]
+                     column_name, referenced_column_name = foreign_key[3:5]
+                     primary_key_column_name = self.introspection.get_primary_key_column(cursor, table_name)
+                     primary_key_value, bad_value = cursor.execute(
+                         'SELECT %s, %s FROM %s WHERE rowid = %%s' % (
+-                            primary_key_column_name, column_name, table_name
++                            self.ops.quote_name(primary_key_column_name), self.ops.quote_name(column_name), self.ops.quote_name(table_name)
+                         ),
+                         (rowid,),
+                     ).fetchone()
+diff --git a/tests/backends/models.py b/tests/backends/models.py
+index 5368e8d903..9283ff6d71 100644
+--- a/tests/backends/models.py
++++ b/tests/backends/models.py
+@@ -140,3 +140,12 @@ class Author(models.Model):
+ 
+ class Book(models.Model):
+     author = models.ForeignKey(Author, models.CASCADE, to_field='name')
++
++
++class Order(models.Model):
++    """Model with a SQL keyword as table name to test constraint checking."""
++    name = models.CharField(max_length=100)
++    reporter = models.ForeignKey(Reporter, models.CASCADE)
++
++    class Meta:
++        db_table = 'order'
+diff --git a/tests/backends/tests.py b/tests/backends/tests.py
+index ed1847ede5..d900c2eea8 100644
+--- a/tests/backends/tests.py
++++ b/tests/backends/tests.py
+@@ -19,7 +19,7 @@ from django.test import (
+ )
+ 
+ from .models import (
+-    Article, Object, ObjectReference, Person, Post, RawData, Reporter,
++    Article, Object, ObjectReference, Order, Person, Post, RawData, Reporter,
+     ReporterProxy, SchoolClass, Square,
+     VeryLongModelNameZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ,
+ )
+@@ -625,6 +625,49 @@ class FkConstraintsTests(TransactionTestCase):
+                     connection.check_constraints()
+             transaction.set_rollback(True)
+ 
++    @skipUnlessDBFeature('supports_pragma_foreign_key_check')
++    def test_check_constraints_with_sql_keyword_table_name(self):
++        """
++        Constraint checks should work with table names that are SQL keywords.
++        Regression test for #13807.
++        """
++        with transaction.atomic():
++            # Create an Order (table name is 'order', a SQL keyword).
++            Order.objects.create(
++                name="Test order",
++                reporter=self.r,
++            )
++            # Retrieve it from the DB
++            o = Order.objects.get(name="Test order")
++            o.reporter_id = 30
++            with connection.constraint_checks_disabled():
++                o.save()
++                with self.assertRaises(IntegrityError):
++                    connection.check_constraints()
++            transaction.set_rollback(True)
++
++
++class LoadDataTests(TransactionTestCase):
++    available_apps = ['backends']
++
++    @skipUnlessDBFeature('supports_pragma_foreign_key_check')
++    def test_loaddata_with_sql_keyword_table_name(self):
++        """
++        loaddata should work with table names that are SQL keywords.
++        Regression test for #13807.
++        """
++        from django.core.management import call_command
++        from io import StringIO
++        
++        # This should not raise an error
++        call_command('loaddata', 'order_fixture', verbosity=0)
++        
++        # Verify the data was loaded
++        self.assertEqual(Order.objects.count(), 1)
++        order = Order.objects.first()
++        self.assertEqual(order.name, "Test Order")
++        self.assertEqual(order.reporter.first_name, "John")
++
+ 
+ class ThreadTests(TransactionTestCase):
+ 

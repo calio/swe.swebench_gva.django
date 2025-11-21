@@ -140,3 +140,12 @@ class Author(models.Model):
 
 class Book(models.Model):
     author = models.ForeignKey(Author, models.CASCADE, to_field='name')
+
+
+class Order(models.Model):
+    """Model with a SQL keyword as table name to test constraint checking."""
+    name = models.CharField(max_length=100)
+    reporter = models.ForeignKey(Reporter, models.CASCADE)
+
+    class Meta:
+        db_table = 'order'

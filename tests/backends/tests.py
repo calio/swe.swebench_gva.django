@@ -19,7 +19,7 @@ from django.test import (
 )
 
 from .models import (
-    Article, Object, ObjectReference, Person, Post, RawData, Reporter,
+    Article, Object, ObjectReference, Order, Person, Post, RawData, Reporter,
     ReporterProxy, SchoolClass, Square,
     VeryLongModelNameZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ,
 )
@@ -624,6 +624,49 @@ class FkConstraintsTests(TransactionTestCase):
                 with self.assertRaises(IntegrityError):
                     connection.check_constraints()
             transaction.set_rollback(True)
+
+    @skipUnlessDBFeature('supports_pragma_foreign_key_check')
+    def test_check_constraints_with_sql_keyword_table_name(self):
+        """
+        Constraint checks should work with table names that are SQL keywords.
+        Regression test for #13807.
+        """
+        with transaction.atomic():
+            # Create an Order (table name is 'order', a SQL keyword).
+            Order.objects.create(
+                name="Test order",
+                reporter=self.r,
+            )
+            # Retrieve it from the DB
+            o = Order.objects.get(name="Test order")
+            o.reporter_id = 30
+            with connection.constraint_checks_disabled():
+                o.save()
+                with self.assertRaises(IntegrityError):
+                    connection.check_constraints()
+            transaction.set_rollback(True)
+
+
+class LoadDataTests(TransactionTestCase):
+    available_apps = ['backends']
+
+    @skipUnlessDBFeature('supports_pragma_foreign_key_check')
+    def test_loaddata_with_sql_keyword_table_name(self):
+        """
+        loaddata should work with table names that are SQL keywords.
+        Regression test for #13807.
+        """
+        from django.core.management import call_command
+        from io import StringIO
+        
+        # This should not raise an error
+        call_command('loaddata', 'order_fixture', verbosity=0)
+        
+        # Verify the data was loaded
+        self.assertEqual(Order.objects.count(), 1)
+        order = Order.objects.first()
+        self.assertEqual(order.name, "Test Order")
+        self.assertEqual(order.reporter.first_name, "John")
 
 
 class ThreadTests(TransactionTestCase):
