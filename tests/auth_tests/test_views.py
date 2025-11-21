@@ -681,6 +681,40 @@ class SessionAuthenticationTests(AuthViewsTestCase):
         # The session key is rotated.
         self.assertNotEqual(original_session_key, self.client.session.session_key)
 
+    @override_settings(
+        SECRET_KEY="newsecret",
+        SECRET_KEY_FALLBACKS=["oldsecret"],
+    )
+    def test_session_auth_hash_with_secret_key_fallbacks(self):
+        """
+        Sessions created with an old SECRET_KEY should still be valid when
+        the old key is in SECRET_KEY_FALLBACKS.
+        """
+        from django.contrib.auth import HASH_SESSION_KEY, SESSION_KEY
+        from django.contrib.auth import get_user
+
+        # Create a user and get their session auth hash with the old secret
+        user = User.objects.get(username="testclient")
+        old_session_hash = user.get_session_auth_hash(secret="oldsecret")
+
+        # Create a session with the old secret key
+        engine = import_module(settings.SESSION_ENGINE)
+        session = engine.SessionStore()
+        session[SESSION_KEY] = user.id
+        session[BACKEND_SESSION_KEY] = settings.AUTHENTICATION_BACKENDS[0]
+        session[HASH_SESSION_KEY] = old_session_hash
+        session.save()
+
+        # Create a request with the old session
+        request = HttpRequest()
+        request.session = session
+
+        # The user should be retrieved successfully even though the session
+        # was created with the old secret key
+        retrieved_user = get_user(request)
+        self.assertEqual(retrieved_user.id, user.id)
+        self.assertEqual(retrieved_user.username, "testclient")
+
 
 class LoginTest(AuthViewsTestCase):
     def test_current_site_in_context_after_login(self):
