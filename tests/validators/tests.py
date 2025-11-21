@@ -354,6 +354,67 @@ class TestValidators(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, '"djangoproject.com" has more than 16 characters.'):
             v('djangoproject.com')
 
+    def test_regex_validator_value_in_params(self):
+        v = RegexValidator('[0-9]+', message='%(value)s is not a number.')
+        with self.assertRaisesMessage(ValidationError, 'abc is not a number.'):
+            v('abc')
+
+    def test_email_validator_value_in_params(self):
+        v = EmailValidator(message='%(value)s is not a valid email.')
+        with self.assertRaisesMessage(ValidationError, 'invalid is not a valid email.'):
+            v('invalid')
+
+    def test_url_validator_value_in_params(self):
+        v = URLValidator(message='%(value)s is not a valid URL.')
+        with self.assertRaisesMessage(ValidationError, 'not a url is not a valid URL.'):
+            v('not a url')
+
+    def test_ipv4_validator_value_in_params(self):
+        try:
+            validate_ipv4_address('invalid')
+            self.fail('ValidationError not raised')
+        except ValidationError as e:
+            # Check that value is in params
+            self.assertIn('value', e.error_list[0].params)
+            self.assertEqual(e.error_list[0].params['value'], 'invalid')
+
+    def test_ipv6_validator_value_in_params(self):
+        try:
+            validate_ipv6_address('invalid')
+            self.fail('ValidationError not raised')
+        except ValidationError as e:
+            # Check that value is in params
+            self.assertIn('value', e.error_list[0].params)
+            self.assertEqual(e.error_list[0].params['value'], 'invalid')
+
+    def test_ipv46_validator_value_in_params(self):
+        try:
+            validate_ipv46_address('invalid')
+            self.fail('ValidationError not raised')
+        except ValidationError as e:
+            # Check that value is in params
+            self.assertIn('value', e.error_list[0].params)
+            self.assertEqual(e.error_list[0].params['value'], 'invalid')
+
+    def test_prohibit_null_characters_validator_value_in_params(self):
+        v = ProhibitNullCharactersValidator(message='%(value)s contains null characters.')
+        try:
+            v('test\x00value')
+            self.fail('ValidationError not raised')
+        except ValidationError as e:
+            # Check that value is in params
+            self.assertIn('value', e.error_list[0].params)
+            self.assertEqual(e.error_list[0].params['value'], 'test\x00value')
+
+    def test_file_extension_validator_value_in_params(self):
+        v = FileExtensionValidator(['txt'])
+        try:
+            v(ContentFile('contents', name='file.jpg'))
+            self.fail('ValidationError not raised')
+        except ValidationError as e:
+            # Check that value is in params
+            self.assertIn('value', e.error_list[0].params)
+
 
 class TestValidatorEquality(TestCase):
     """
