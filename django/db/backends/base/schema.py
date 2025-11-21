@@ -403,6 +403,12 @@ class BaseDatabaseSchemaEditor:
         meta_constraint_names = {constraint.name for constraint in model._meta.constraints}
         meta_index_names = {constraint.name for constraint in model._meta.indexes}
         columns = [model._meta.get_field(field).column for field in fields]
+        # When deleting an index, exclude unique constraints to avoid deleting
+        # the wrong constraint when both unique_together and index_together
+        # exist on the same fields.
+        if constraint_kwargs.get('index'):
+            constraint_kwargs = constraint_kwargs.copy()
+            constraint_kwargs['unique'] = False
         constraint_names = self._constraint_names(
             model, columns, exclude=meta_constraint_names | meta_index_names,
             **constraint_kwargs

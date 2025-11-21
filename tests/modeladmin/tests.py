@@ -459,6 +459,28 @@ class ModelAdminTests(TestCase):
         # Without the override this would be ForeignKeyRawIdWidget.
         self.assertIsInstance(band_widget, Select)
 
+    def test_manytomany_widget_override(self):
+        """
+        The autocomplete_fields, raw_id_fields, and filter_vertical/filter_horizontal
+        widgets for ManyToManyField may be overridden by specifying a widget in
+        get_formset().
+        """
+        class SongInline(TabularInline):
+            model = Song
+            raw_id_fields = ('featuring',)
+
+            def get_formset(self, request, obj=None, **kwargs):
+                kwargs['widgets'] = {'featuring': Select}
+                return super().get_formset(request, obj, **kwargs)
+
+        class BandAdmin(ModelAdmin):
+            inlines = [SongInline]
+
+        ma = BandAdmin(Band, self.site)
+        song_widget = list(ma.get_formsets_with_inlines(request))[0][0]().forms[0].fields['featuring'].widget
+        # Without the override this would be ManyToManyRawIdWidget.
+        self.assertIsInstance(song_widget, Select)
+
     def test_queryset_override(self):
         # If the queryset of a ModelChoiceField in a custom form is overridden,
         # RelatedFieldWidgetWrapper doesn't mess that up.

@@ -2246,6 +2246,55 @@ class SchemaTests(TransactionTestCase):
             editor.remove_index(AuthorWithIndexedNameAndBirthday, index)
 
     @isolate_apps('schema')
+    def test_remove_index_together_with_unique_together_on_same_fields(self):
+        """
+        Tests that removing index_together works when unique_together is
+        defined on the same fields (issue #24757).
+        """
+        class TestModel(Model):
+            field1 = CharField(max_length=100)
+            field2 = CharField(max_length=100)
+
+            class Meta:
+                app_label = 'schema'
+                unique_together = [('field1', 'field2')]
+                index_together = [('field1', 'field2')]
+
+        # Create the table
+        with connection.schema_editor() as editor:
+            editor.create_model(TestModel)
+
+        # Verify both unique and index constraints exist
+        constraints = self.get_constraints(TestModel._meta.db_table)
+        unique_constraints = [
+            name for name, details in constraints.items()
+            if details['columns'] == ['field1', 'field2'] and details['unique']
+        ]
+        index_constraints = [
+            name for name, details in constraints.items()
+            if details['columns'] == ['field1', 'field2'] and details['index'] and not details['unique']
+        ]
+        self.assertEqual(len(unique_constraints), 1, "Should have one unique constraint")
+        self.assertEqual(len(index_constraints), 1, "Should have one index constraint")
+
+        # Remove index_together - this should not raise ValueError
+        with connection.schema_editor() as editor:
+            editor.alter_index_together(TestModel, [('field1', 'field2')], [])
+
+        # Verify unique constraint still exists but index is removed
+        constraints = self.get_constraints(TestModel._meta.db_table)
+        unique_constraints = [
+            name for name, details in constraints.items()
+            if details['columns'] == ['field1', 'field2'] and details['unique']
+        ]
+        index_constraints = [
+            name for name, details in constraints.items()
+            if details['columns'] == ['field1', 'field2'] and details['index'] and not details['unique']
+        ]
+        self.assertEqual(len(unique_constraints), 1, "Should still have one unique constraint")
+        self.assertEqual(len(index_constraints), 0, "Should have no index constraint")
+
+    @isolate_apps('schema')
     def test_db_table(self):
         """
         Tests renaming of the table
