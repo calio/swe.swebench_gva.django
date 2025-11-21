@@ -891,6 +891,53 @@ class OperationTests(OperationTestBase):
         ponyrider = PonyRider.objects.create()
         ponyrider.riders.add(jockey)
 
+    def test_rename_model_with_db_table(self):
+        """
+        RenameModel with db_table should be a noop.
+        """
+        app_label = "test_rename_model_with_db_table"
+        project_state = self.apply_operations(app_label, ProjectState(), operations=[
+            migrations.CreateModel(
+                "Pony",
+                fields=[("id", models.AutoField(primary_key=True))],
+                options={"db_table": "custom_pony_table"},
+            ),
+            migrations.CreateModel(
+                "Rider",
+                fields=[
+                    ("id", models.AutoField(primary_key=True)),
+                    ("pony", models.ForeignKey("test_rename_model_with_db_table.Pony", models.CASCADE)),
+                ],
+            ),
+        ])
+        # Verify the table exists with the custom name
+        self.assertTableExists("custom_pony_table")
+        self.assertTableNotExists(f"{app_label}_pony")
+        
+        # Create some data
+        Pony = project_state.apps.get_model(app_label, "Pony")
+        Rider = project_state.apps.get_model(app_label, "Rider")
+        pony = Pony.objects.create()
+        rider = Rider.objects.create(pony=pony)
+        
+        # Rename the model - should be a noop since db_table is already set
+        project_state = self.apply_operations(
+            app_label,
+            project_state,
+            operations=[migrations.RenameModel("Pony", "Horse")],
+            atomic=connection.features.supports_atomic_references_rename,
+        )
+        
+        # The table should still exist with the custom name
+        self.assertTableExists("custom_pony_table")
+        self.assertTableNotExists(f"{app_label}_horse")
+        
+        # Data should still be accessible
+        Horse = project_state.apps.get_model(app_label, "Horse")
+        Rider = project_state.apps.get_model(app_label, "Rider")
+        self.assertEqual(Horse.objects.count(), 1)
+        self.assertEqual(Rider.objects.count(), 1)
+
     def test_add_field(self):
         """
         Tests the AddField operation.
