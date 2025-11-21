@@ -211,6 +211,12 @@ class QuerySet:
     @query.setter
     def query(self, value):
         self._query = value
+        # If the query has values_select set, update the _iterable_class to
+        # ValuesIterable. This is necessary when a pickled query object is
+        # assigned to a new queryset, as the _iterable_class is not preserved
+        # in the query object itself.
+        if value.values_select:
+            self._iterable_class = ValuesIterable
 
     def as_manager(cls):
         # Address the circular dependency between `Queryset` and `Manager`.
