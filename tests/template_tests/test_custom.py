@@ -62,6 +62,8 @@ class SimpleTagTests(TagTestCase):
                 'simple_keyword_only_param - Expected result: 37'),
             ('{% load custom %}{% simple_keyword_only_default %}',
                 'simple_keyword_only_default - Expected result: 42'),
+            ('{% load custom %}{% simple_keyword_only_default kwarg=99 %}',
+                'simple_keyword_only_default - Expected result: 99'),
             ('{% load custom %}{% simple_one_default 37 %}', 'simple_one_default - Expected result: 37, hi'),
             ('{% load custom %}{% simple_one_default 37 two="hello" %}',
                 'simple_one_default - Expected result: 37, hello'),
@@ -101,6 +103,8 @@ class SimpleTagTests(TagTestCase):
                 '{% load custom %}{% simple_unlimited_args_kwargs 37 40|add:2 eggs="scrambled" 56 four=1|add:3 %}'),
             ("'simple_unlimited_args_kwargs' received multiple values for keyword argument 'eggs'",
                 '{% load custom %}{% simple_unlimited_args_kwargs 37 eggs="scrambled" eggs="scrambled" %}'),
+            ("'simple_keyword_only_default' received multiple values for keyword argument 'kwarg'",
+                '{% load custom %}{% simple_keyword_only_default kwarg=99 kwarg=100 %}'),
         ]
 
         for entry in errors:
