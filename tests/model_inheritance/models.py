@@ -182,3 +182,22 @@ class Child(Parent):
 
 class GrandChild(Child):
     pass
+
+
+#
+# Multiple inheritance with two concrete base classes
+#
+
+
+class ConcreteBase(models.Model):
+    base_id = models.AutoField(primary_key=True)
+    field_base = models.IntegerField()
+
+
+class ConcreteOtherBase(models.Model):
+    otherbase_id = models.AutoField(primary_key=True)
+    field_otherbase = models.IntegerField()
+
+
+class MultiInheritanceChild(ConcreteBase, ConcreteOtherBase):
+    pass

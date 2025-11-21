@@ -10,10 +10,13 @@ from .models import (
     Base,
     Chef,
     CommonInfo,
+    ConcreteBase,
+    ConcreteOtherBase,
     GrandChild,
     GrandParent,
     ItalianRestaurant,
     MixinModel,
+    MultiInheritanceChild,
     Parent,
     ParkingLot,
     Place,
@@ -619,3 +622,45 @@ class InheritanceUniqueTests(TestCase):
         msg = "Grand parent with this First name and Last name already exists."
         with self.assertRaisesMessage(ValidationError, msg):
             grand_child.validate_unique()
+
+    def test_multiple_inheritance_update(self):
+        """
+        Test that queryset update works correctly with multiple inheritance.
+        Regression test for issue where update on a child model with multiple
+        inheritance would update the wrong parent table.
+        
+        The issue occurs when:
+        1. A model inherits from multiple non-abstract base classes
+        2. We update a field from a non-first parent class
+        3. The update query uses primary keys from the first parent but updates
+           the second parent table
+        """
+        # Create test data - first create some ConcreteOtherBase objects
+        other1 = ConcreteOtherBase.objects.create(field_otherbase=100)
+        other2 = ConcreteOtherBase.objects.create(field_otherbase=101)
+        
+        # Create MultiInheritanceChild objects (inherits from ConcreteBase and ConcreteOtherBase)
+        child1 = MultiInheritanceChild.objects.create(
+            field_base=0,
+            field_otherbase=0
+        )
+        child2 = MultiInheritanceChild.objects.create(
+            field_base=1,
+            field_otherbase=1
+        )
+        
+        # Update a field from the second parent (ConcreteOtherBase)
+        # This should update the child's field_otherbase, not the ConcreteOtherBase objects
+        MultiInheritanceChild.objects.all().update(field_otherbase=55)
+        
+        # Verify the update worked correctly on MultiInheritanceChild
+        child1.refresh_from_db()
+        child2.refresh_from_db()
+        self.assertEqual(child1.field_otherbase, 55)
+        self.assertEqual(child2.field_otherbase, 55)
+        
+        # Verify that ConcreteOtherBase objects were not affected
+        other1.refresh_from_db()
+        other2.refresh_from_db()
+        self.assertEqual(other1.field_otherbase, 100)
+        self.assertEqual(other2.field_otherbase, 101)

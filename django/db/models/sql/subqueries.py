@@ -134,7 +134,11 @@ class UpdateQuery(Query):
             query = UpdateQuery(model)
             query.values = values
             if self.related_ids is not None:
-                query.add_filter("pk__in", self.related_ids)
+                # Use the correct IDs for this related model if available
+                if hasattr(self, 'related_idents') and model in self.related_idents:
+                    query.add_filter("pk__in", self.related_idents[model])
+                else:
+                    query.add_filter("pk__in", self.related_ids)
             result.append(query)
         return result
 

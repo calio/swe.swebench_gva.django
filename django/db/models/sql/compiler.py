@@ -1836,7 +1836,23 @@ class SQLUpdateCompiler(SQLCompiler):
         query.clear_ordering(force=True)
         query.extra = {}
         query.select = []
-        query.add_fields([query.get_meta().pk.name])
+        
+        # Collect the fields to select for the main model and related models
+        fields_to_select = [query.get_meta().pk.name]
+        related_model_fields = {}
+        
+        # For each related model, we need to select the parent link field
+        # so we can correctly filter the related model's table
+        if self.query.related_updates:
+            for related_model in self.query.related_updates.keys():
+                # Find the parent link field from the main model to the related model
+                for parent, field in query.get_meta().parents.items():
+                    if parent == related_model and field:
+                        fields_to_select.append(field.attname)
+                        related_model_fields[related_model] = field.attname
+                        break
+        
+        query.add_fields(fields_to_select)
         super().pre_sql_setup()
 
         must_pre_select = (
@@ -1851,10 +1867,23 @@ class SQLUpdateCompiler(SQLCompiler):
             # don't want them to change), or the db backend doesn't support
             # selecting from the updating table (e.g. MySQL).
             idents = []
+            related_idents = {}
+            
             for rows in query.get_compiler(self.using).execute_sql(MULTI):
                 idents.extend(r[0] for r in rows)
+                
+                # If we have related updates, collect the related IDs
+                if self.query.related_updates:
+                    for related_model, field_attname in related_model_fields.items():
+                        if related_model not in related_idents:
+                            related_idents[related_model] = []
+                        # Find the index of this field in fields_to_select
+                        field_index = fields_to_select.index(field_attname)
+                        related_idents[related_model].extend(r[field_index] for r in rows)
+            
             self.query.add_filter("pk__in", idents)
             self.query.related_ids = idents
+            self.query.related_idents = related_idents
         else:
             # The fast path. Filters and updates in one query.
             self.query.add_filter("pk__in", query)

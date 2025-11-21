@@ -1,0 +1,161 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 59a5d6abbb..21877d793f 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1836,7 +1836,23 @@ class SQLUpdateCompiler(SQLCompiler):
+         query.clear_ordering(force=True)
+         query.extra = {}
+         query.select = []
+-        query.add_fields([query.get_meta().pk.name])
++        
++        # Collect the fields to select for the main model and related models
++        fields_to_select = [query.get_meta().pk.name]
++        related_model_fields = {}
++        
++        # For each related model, we need to select the parent link field
++        # so we can correctly filter the related model's table
++        if self.query.related_updates:
++            for related_model in self.query.related_updates.keys():
++                # Find the parent link field from the main model to the related model
++                for parent, field in query.get_meta().parents.items():
++                    if parent == related_model and field:
++                        fields_to_select.append(field.attname)
++                        related_model_fields[related_model] = field.attname
++                        break
++        
++        query.add_fields(fields_to_select)
+         super().pre_sql_setup()
+ 
+         must_pre_select = (
+@@ -1851,10 +1867,23 @@ class SQLUpdateCompiler(SQLCompiler):
+             # don't want them to change), or the db backend doesn't support
+             # selecting from the updating table (e.g. MySQL).
+             idents = []
++            related_idents = {}
++            
+             for rows in query.get_compiler(self.using).execute_sql(MULTI):
+                 idents.extend(r[0] for r in rows)
++                
++                # If we have related updates, collect the related IDs
++                if self.query.related_updates:
++                    for related_model, field_attname in related_model_fields.items():
++                        if related_model not in related_idents:
++                            related_idents[related_model] = []
++                        # Find the index of this field in fields_to_select
++                        field_index = fields_to_select.index(field_attname)
++                        related_idents[related_model].extend(r[field_index] for r in rows)
++            
+             self.query.add_filter("pk__in", idents)
+             self.query.related_ids = idents
++            self.query.related_idents = related_idents
+         else:
+             # The fast path. Filters and updates in one query.
+             self.query.add_filter("pk__in", query)
+diff --git a/django/db/models/sql/subqueries.py b/django/db/models/sql/subqueries.py
+index 04063f73bc..3e06a58af0 100644
+--- a/django/db/models/sql/subqueries.py
++++ b/django/db/models/sql/subqueries.py
+@@ -134,7 +134,11 @@ class UpdateQuery(Query):
+             query = UpdateQuery(model)
+             query.values = values
+             if self.related_ids is not None:
+-                query.add_filter("pk__in", self.related_ids)
++                # Use the correct IDs for this related model if available
++                if hasattr(self, 'related_idents') and model in self.related_idents:
++                    query.add_filter("pk__in", self.related_idents[model])
++                else:
++                    query.add_filter("pk__in", self.related_ids)
+             result.append(query)
+         return result
+ 
+diff --git a/tests/model_inheritance/models.py b/tests/model_inheritance/models.py
+index a479faeda5..6d8c3a11e5 100644
+--- a/tests/model_inheritance/models.py
++++ b/tests/model_inheritance/models.py
+@@ -182,3 +182,22 @@ class Child(Parent):
+ 
+ class GrandChild(Child):
+     pass
++
++
++#
++# Multiple inheritance with two concrete base classes
++#
++
++
++class ConcreteBase(models.Model):
++    base_id = models.AutoField(primary_key=True)
++    field_base = models.IntegerField()
++
++
++class ConcreteOtherBase(models.Model):
++    otherbase_id = models.AutoField(primary_key=True)
++    field_otherbase = models.IntegerField()
++
++
++class MultiInheritanceChild(ConcreteBase, ConcreteOtherBase):
++    pass
+diff --git a/tests/model_inheritance/tests.py b/tests/model_inheritance/tests.py
+index 882f2999e2..dbb0fdc4d1 100644
+--- a/tests/model_inheritance/tests.py
++++ b/tests/model_inheritance/tests.py
+@@ -10,10 +10,13 @@ from .models import (
+     Base,
+     Chef,
+     CommonInfo,
++    ConcreteBase,
++    ConcreteOtherBase,
+     GrandChild,
+     GrandParent,
+     ItalianRestaurant,
+     MixinModel,
++    MultiInheritanceChild,
+     Parent,
+     ParkingLot,
+     Place,
+@@ -619,3 +622,45 @@ class InheritanceUniqueTests(TestCase):
+         msg = "Grand parent with this First name and Last name already exists."
+         with self.assertRaisesMessage(ValidationError, msg):
+             grand_child.validate_unique()
++
++    def test_multiple_inheritance_update(self):
++        """
++        Test that queryset update works correctly with multiple inheritance.
++        Regression test for issue where update on a child model with multiple
++        inheritance would update the wrong parent table.
++        
++        The issue occurs when:
++        1. A model inherits from multiple non-abstract base classes
++        2. We update a field from a non-first parent class
++        3. The update query uses primary keys from the first parent but updates
++           the second parent table
++        """
++        # Create test data - first create some ConcreteOtherBase objects
++        other1 = ConcreteOtherBase.objects.create(field_otherbase=100)
++        other2 = ConcreteOtherBase.objects.create(field_otherbase=101)
++        
++        # Create MultiInheritanceChild objects (inherits from ConcreteBase and ConcreteOtherBase)
++        child1 = MultiInheritanceChild.objects.create(
++            field_base=0,
++            field_otherbase=0
++        )
++        child2 = MultiInheritanceChild.objects.create(
++            field_base=1,
++            field_otherbase=1
++        )
++        
++        # Update a field from the second parent (ConcreteOtherBase)
++        # This should update the child's field_otherbase, not the ConcreteOtherBase objects
++        MultiInheritanceChild.objects.all().update(field_otherbase=55)
++        
++        # Verify the update worked correctly on MultiInheritanceChild
++        child1.refresh_from_db()
++        child2.refresh_from_db()
++        self.assertEqual(child1.field_otherbase, 55)
++        self.assertEqual(child2.field_otherbase, 55)
++        
++        # Verify that ConcreteOtherBase objects were not affected
++        other1.refresh_from_db()
++        other2.refresh_from_db()
++        self.assertEqual(other1.field_otherbase, 100)
++        self.assertEqual(other2.field_otherbase, 101)
