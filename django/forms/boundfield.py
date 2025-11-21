@@ -1,6 +1,7 @@
 import datetime
 import re
 
+from django.core.exceptions import ValidationError
 from django.forms.utils import flatatt, pretty_name
 from django.forms.widgets import Textarea, TextInput
 from django.utils.functional import cached_property
@@ -231,6 +232,26 @@ class BoundField:
     @property
     def widget_type(self):
         return re.sub(r'widget$|input$', '', self.field.widget.__class__.__name__.lower())
+
+    def _did_change(self):
+        """
+        Return True if the field's value has changed from its initial value.
+        """
+        if not self.field.show_hidden_initial:
+            # Use the BoundField's initial as this is the value passed to
+            # the widget.
+            initial_value = self.initial
+        else:
+            initial_prefixed_name = self.form.add_initial_prefix(self.name)
+            hidden_widget = self.field.hidden_widget()
+            try:
+                initial_value = self.field.to_python(
+                    self.form._widget_data_value(hidden_widget, initial_prefixed_name)
+                )
+            except ValidationError:
+                # Always assume data has changed if validation fails.
+                return True
+        return self.field.has_changed(initial_value, self.data)
 
 
 @html_safe
