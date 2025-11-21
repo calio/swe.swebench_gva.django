@@ -1,0 +1,63 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index 90fc31bee5..b69c431971 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -202,6 +202,19 @@ class CreateModel(ModelOperation):
+                     managers=self.managers,
+                 ),
+             ]
++        elif (
++            isinstance(operation, AlterModelManagers)
++            and self.name_lower == operation.name_lower
++        ):
++            return [
++                CreateModel(
++                    self.name,
++                    fields=self.fields,
++                    options=self.options,
++                    bases=self.bases,
++                    managers=operation.managers,
++                ),
++            ]
+         elif (
+             isinstance(operation, FieldOperation)
+             and self.name_lower == operation.model_name_lower
+diff --git a/tests/migrations/test_optimizer.py b/tests/migrations/test_optimizer.py
+index 59dd401a3c..8213b0011b 100644
+--- a/tests/migrations/test_optimizer.py
++++ b/tests/migrations/test_optimizer.py
+@@ -129,6 +129,34 @@ class OptimizerTests(SimpleTestCase):
+             ],
+         )
+ 
++    def test_create_alter_model_managers(self):
++        managers = [("objects", EmptyManager())]
++        self.assertOptimizesTo(
++            [
++                migrations.CreateModel("Foo", fields=[]),
++                migrations.AlterModelManagers("Foo", managers=managers),
++            ],
++            [
++                migrations.CreateModel("Foo", fields=[], managers=managers),
++            ],
++        )
++
++    def test_create_alter_model_managers_replace(self):
++        """
++        CreateModel with managers should have them replaced by AlterModelManagers.
++        """
++        old_managers = [("objects", EmptyManager())]
++        new_managers = [("custom", EmptyManager())]
++        self.assertOptimizesTo(
++            [
++                migrations.CreateModel("Foo", fields=[], managers=old_managers),
++                migrations.AlterModelManagers("Foo", managers=new_managers),
++            ],
++            [
++                migrations.CreateModel("Foo", fields=[], managers=new_managers),
++            ],
++        )
++
+     def test_create_model_and_remove_model_options(self):
+         self.assertOptimizesTo(
+             [

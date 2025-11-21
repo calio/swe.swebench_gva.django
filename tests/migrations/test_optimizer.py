@@ -129,6 +129,34 @@ class OptimizerTests(SimpleTestCase):
             ],
         )
 
+    def test_create_alter_model_managers(self):
+        managers = [("objects", EmptyManager())]
+        self.assertOptimizesTo(
+            [
+                migrations.CreateModel("Foo", fields=[]),
+                migrations.AlterModelManagers("Foo", managers=managers),
+            ],
+            [
+                migrations.CreateModel("Foo", fields=[], managers=managers),
+            ],
+        )
+
+    def test_create_alter_model_managers_replace(self):
+        """
+        CreateModel with managers should have them replaced by AlterModelManagers.
+        """
+        old_managers = [("objects", EmptyManager())]
+        new_managers = [("custom", EmptyManager())]
+        self.assertOptimizesTo(
+            [
+                migrations.CreateModel("Foo", fields=[], managers=old_managers),
+                migrations.AlterModelManagers("Foo", managers=new_managers),
+            ],
+            [
+                migrations.CreateModel("Foo", fields=[], managers=new_managers),
+            ],
+        )
+
     def test_create_model_and_remove_model_options(self):
         self.assertOptimizesTo(
             [
