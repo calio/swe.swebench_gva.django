@@ -967,7 +967,56 @@ class RenameIndex(IndexOperation):
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
         if self.old_fields:
-            # Backward operation with unnamed index is a no-op.
+            # Backward operation with unnamed index: rename the index back to the
+            # auto-generated name.
+            model = from_state.apps.get_model(app_label, self.model_name)
+            if not self.allow_migrate_model(schema_editor.connection.alias, model):
+                return
+
+            columns = [
+                model._meta.get_field(field).column for field in self.old_fields
+            ]
+            # Find the current index name (should be self.new_name)
+            matching_index_name = schema_editor._constraint_names(
+                model, column_names=columns, index=True
+            )
+            print(f"DEBUG database_backwards: matching_index_name: {matching_index_name}")
+            if len(matching_index_name) != 1:
+                raise ValueError(
+                    "Found wrong number (%s) of indexes for %s(%s)."
+                    % (
+                        len(matching_index_name),
+                        model._meta.db_table,
+                        ", ".join(columns),
+                    )
+                )
+            # Get the old auto-generated index name from the to_state
+            to_model_state = to_state.models[app_label, self.model_name_lower]
+            # Find the index for these fields in the to_state (before the rename)
+            old_index_name = None
+            for index in to_model_state.options.get("indexes", []):
+                if index.fields == self.old_fields:
+                    old_index_name = index.name
+                    break
+            
+            print(f"DEBUG database_backwards: old_index_name: {old_index_name}")
+            if old_index_name is None:
+                # If not found in indexes, it might be in index_together
+                # In that case, we need to find the auto-generated name
+                # For now, we'll just return since we can't determine the old name
+                print(f"DEBUG database_backwards: old_index_name is None, returning")
+                return
+
+            old_index = models.Index(
+                fields=self.old_fields,
+                name=old_index_name,
+            )
+            new_index = models.Index(
+                fields=self.old_fields,
+                name=matching_index_name[0],
+            )
+            print(f"DEBUG database_backwards: renaming {new_index.name} to {old_index.name}")
+            schema_editor.rename_index(model, new_index, old_index)
             return
 
         self.new_name_lower, self.old_name_lower = (

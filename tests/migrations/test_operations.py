@@ -3001,6 +3001,101 @@ class OperationTests(OperationTestBase):
             },
         )
 
+    def test_rename_index_unnamed_index_forward_backward_forward(self):
+        """Test that re-applying RenameIndex after moving backward works."""
+        app_label = "test_rninuifbf"
+        project_state = self.set_up_test_model(app_label, index_together=True)
+        table_name = app_label + "_pony"
+        self.assertIndexNameNotExists(table_name, "new_pony_test_idx")
+        operation = migrations.RenameIndex(
+            "Pony", new_name="new_pony_test_idx", old_fields=("weight", "pink")
+        )
+
+        new_state = project_state.clone()
+        operation.state_forwards(app_label, new_state)
+        # Rename index.
+        with connection.schema_editor() as editor:
+            operation.database_forwards(app_label, editor, project_state, new_state)
+        self.assertIndexNameExists(table_name, "new_pony_test_idx")
+        # Reverse is a no-op.
+        with connection.schema_editor() as editor, self.assertNumQueries(0):
+            operation.database_backwards(app_label, editor, new_state, project_state)
+        self.assertIndexNameExists(table_name, "new_pony_test_idx")
+        # Re-apply renaming.
+        with connection.schema_editor() as editor:
+            operation.database_forwards(app_label, editor, project_state, new_state)
+        self.assertIndexNameExists(table_name, "new_pony_test_idx")
+
+    def test_rename_index_unnamed_index_migration_unapply_reapply(self):
+        """Test that unapplying and re-applying a migration with RenameIndex works."""
+        app_label = "test_rninimur"
+        project_state = self.set_up_test_model(app_label, index_together=True)
+        table_name = app_label + "_pony"
+        self.assertIndexNameNotExists(table_name, "new_pony_test_idx")
+
+        # Create a migration with RenameIndex operation
+        operation = migrations.RenameIndex(
+            "Pony", new_name="new_pony_test_idx", old_fields=("weight", "pink")
+        )
+
+        new_state = project_state.clone()
+        operation.state_forwards(app_label, new_state)
+        # Rename index.
+        with connection.schema_editor() as editor:
+            operation.database_forwards(app_label, editor, project_state, new_state)
+        self.assertIndexNameExists(table_name, "new_pony_test_idx")
+        # Reverse: rename the index back to the auto-generated name.
+        with connection.schema_editor() as editor:
+            operation.database_backwards(app_label, editor, new_state, project_state)
+        # After backward, the index should be back to the auto-generated name
+        # (which is not "new_pony_test_idx")
+        self.assertIndexNameNotExists(table_name, "new_pony_test_idx")
+        # Re-apply renaming.
+        with connection.schema_editor() as editor:
+            operation.database_forwards(app_label, editor, project_state, new_state)
+        self.assertIndexNameExists(table_name, "new_pony_test_idx")
+
+    def test_rename_index_unnamed_index_state_consistency(self):
+        """Test that state is consistent after unapply and reapply."""
+        app_label = "test_rninuisc"
+        project_state = self.set_up_test_model(app_label, index_together=True)
+
+        # Create a migration with RenameIndex operation
+        operation = migrations.RenameIndex(
+            "Pony", new_name="new_pony_test_idx", old_fields=("weight", "pink")
+        )
+        migration = Migration("0001_initial", app_label)
+        migration.operations = [operation]
+
+        # Apply the migration and check state
+        with connection.schema_editor() as editor:
+            migration.apply(project_state, editor)
+
+        # Check that the index is in the state
+        model_state = project_state.models[app_label, "pony"]
+        index_names = [idx.name for idx in model_state.options.get("indexes", [])]
+        self.assertIn("new_pony_test_idx", index_names)
+
+        # Unapply the migration and check state
+        with connection.schema_editor() as editor:
+            state_after_unapply = migration.unapply(project_state, editor)
+
+        # Check that the state is back to the original
+        model_state = state_after_unapply.models[app_label, "pony"]
+        index_names = [idx.name for idx in model_state.options.get("indexes", [])]
+        print(f"After unapply, index_names: {index_names}")
+        print(f"project_state is state_after_unapply: {project_state is state_after_unapply}")
+        self.assertNotIn("new_pony_test_idx", index_names)
+
+        # Re-apply the migration and check state
+        with connection.schema_editor() as editor:
+            migration.apply(project_state, editor)
+
+        # Check that the index is in the state again
+        model_state = project_state.models[app_label, "pony"]
+        index_names = [idx.name for idx in model_state.options.get("indexes", [])]
+        self.assertIn("new_pony_test_idx", index_names)
+
     def test_rename_index_unknown_unnamed_index(self):
         app_label = "test_rninuui"
         project_state = self.set_up_test_model(app_label)

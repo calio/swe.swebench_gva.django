@@ -193,6 +193,20 @@ class Migration:
                 )
             if collect_sql and collected_sql_before == len(schema_editor.collected_sql):
                 schema_editor.collected_sql.append("-- (no-op)")
+        
+        # Return the state before the migration was applied
+        if to_run:
+            old_state = to_run[-1][1]  # to_run[-1][1] is the old_state of the first operation
+            # Debug
+            print(f"DEBUG: Returning old_state from to_run[-1][1]")
+            print(f"DEBUG: to_run length: {len(to_run)}")
+            print(f"DEBUG: to_run[-1][0]: {to_run[-1][0]}")
+            # Check the indexes in old_state
+            for app_label_key, model_state in old_state.models.items():
+                if "pony" in app_label_key[1]:
+                    index_names = [idx.name for idx in model_state.options.get("indexes", [])]
+                    print(f"DEBUG: old_state indexes for {app_label_key}: {index_names}")
+            return old_state
         return project_state
 
     def suggest_name(self):
