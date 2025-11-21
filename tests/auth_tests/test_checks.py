@@ -9,7 +9,7 @@ from django.test import (
 )
 from django.test.utils import isolate_apps
 
-from .models import CustomUserNonUniqueUsername
+from .models import CustomUserNonUniqueUsername, CustomUserWithUniqueConstraint
 
 
 @isolate_apps('auth_tests', attr_name='apps')
@@ -84,6 +84,14 @@ class UserModelChecksTests(SimpleTestCase):
                     id='auth.W004',
                 ),
             ])
+
+    @override_settings(AUTH_USER_MODEL='auth_tests.CustomUserWithUniqueConstraint')
+    def test_username_unique_with_constraint(self):
+        """
+        A USERNAME_FIELD with a UniqueConstraint should not raise an error.
+        """
+        errors = checks.run_checks()
+        self.assertEqual(errors, [])
 
     @override_settings(AUTH_USER_MODEL='auth_tests.BadUser')
     def test_is_anonymous_authenticated_methods(self):

@@ -1,0 +1,143 @@
+diff --git a/django/contrib/auth/checks.py b/django/contrib/auth/checks.py
+index 65fc266f7e..129b3de10f 100644
+--- a/django/contrib/auth/checks.py
++++ b/django/contrib/auth/checks.py
+@@ -52,29 +52,37 @@ def check_user_model(app_configs=None, **kwargs):
+         )
+ 
+     # Check that the username field is unique
+-    if not cls._meta.get_field(cls.USERNAME_FIELD).unique:
+-        if (settings.AUTHENTICATION_BACKENDS ==
+-                ['django.contrib.auth.backends.ModelBackend']):
+-            errors.append(
+-                checks.Error(
+-                    "'%s.%s' must be unique because it is named as the 'USERNAME_FIELD'." % (
+-                        cls._meta.object_name, cls.USERNAME_FIELD
+-                    ),
+-                    obj=cls,
+-                    id='auth.E003',
++    username_field = cls._meta.get_field(cls.USERNAME_FIELD)
++    if not username_field.unique:
++        # Check if there's a UniqueConstraint that covers the USERNAME_FIELD
++        has_unique_constraint = any(
++            cls.USERNAME_FIELD in constraint.fields
++            for constraint in cls._meta.total_unique_constraints
++        )
++        
++        if not has_unique_constraint:
++            if (settings.AUTHENTICATION_BACKENDS ==
++                    ['django.contrib.auth.backends.ModelBackend']):
++                errors.append(
++                    checks.Error(
++                        "'%s.%s' must be unique because it is named as the 'USERNAME_FIELD'." % (
++                            cls._meta.object_name, cls.USERNAME_FIELD
++                        ),
++                        obj=cls,
++                        id='auth.E003',
++                    )
+                 )
+-            )
+-        else:
+-            errors.append(
+-                checks.Warning(
+-                    "'%s.%s' is named as the 'USERNAME_FIELD', but it is not unique." % (
+-                        cls._meta.object_name, cls.USERNAME_FIELD
+-                    ),
+-                    hint='Ensure that your authentication backend(s) can handle non-unique usernames.',
+-                    obj=cls,
+-                    id='auth.W004',
++            else:
++                errors.append(
++                    checks.Warning(
++                        "'%s.%s' is named as the 'USERNAME_FIELD', but it is not unique." % (
++                            cls._meta.object_name, cls.USERNAME_FIELD
++                        ),
++                        hint='Ensure that your authentication backend(s) can handle non-unique usernames.',
++                        obj=cls,
++                        id='auth.W004',
++                    )
+                 )
+-            )
+ 
+     if isinstance(cls().is_anonymous, MethodType):
+         errors.append(
+diff --git a/tests/auth_tests/models/__init__.py b/tests/auth_tests/models/__init__.py
+index 003d8eeaa7..1064611242 100644
+--- a/tests/auth_tests/models/__init__.py
++++ b/tests/auth_tests/models/__init__.py
+@@ -2,7 +2,7 @@ from .custom_permissions import CustomPermissionsUser
+ from .custom_user import (
+     CustomUser, CustomUserWithoutIsActiveField, ExtensionUser,
+ )
+-from .invalid_models import CustomUserNonUniqueUsername
++from .invalid_models import CustomUserNonUniqueUsername, CustomUserWithUniqueConstraint
+ from .is_active import IsActiveTestUser1
+ from .minimal import MinimalUser
+ from .no_password import NoPasswordUser
+@@ -18,8 +18,8 @@ from .with_many_to_many import (
+ __all__ = (
+     'CustomPermissionsUser', 'CustomUser', 'CustomUserNonUniqueUsername',
+     'CustomUserWithFK', 'CustomUserWithM2M', 'CustomUserWithM2MThrough',
+-    'CustomUserWithoutIsActiveField', 'Email', 'ExtensionUser',
+-    'IntegerUsernameUser', 'IsActiveTestUser1', 'MinimalUser',
++    'CustomUserWithoutIsActiveField', 'CustomUserWithUniqueConstraint', 'Email',
++    'ExtensionUser', 'IntegerUsernameUser', 'IsActiveTestUser1', 'MinimalUser',
+     'NoPasswordUser', 'Organization', 'Proxy', 'UUIDUser', 'UserProxy',
+     'UserWithDisabledLastLoginField',
+ )
+diff --git a/tests/auth_tests/models/invalid_models.py b/tests/auth_tests/models/invalid_models.py
+index 123ed4d865..74061a1c48 100644
+--- a/tests/auth_tests/models/invalid_models.py
++++ b/tests/auth_tests/models/invalid_models.py
+@@ -18,3 +18,23 @@ class CustomUserNonUniqueUsername(AbstractBaseUser):
+     REQUIRED_FIELDS = ['email']
+ 
+     objects = UserManager()
++
++
++class CustomUserWithUniqueConstraint(AbstractBaseUser):
++    """
++    A user with a unique constraint on the username field instead of unique=True.
++    """
++    username = models.CharField(max_length=30)
++    email = models.EmailField(blank=True)
++    is_staff = models.BooleanField(default=False)
++    is_superuser = models.BooleanField(default=False)
++
++    USERNAME_FIELD = 'username'
++    REQUIRED_FIELDS = ['email']
++
++    objects = UserManager()
++
++    class Meta:
++        constraints = [
++            models.UniqueConstraint(fields=['username'], name='custom_user_username_unq'),
++        ]
+diff --git a/tests/auth_tests/test_checks.py b/tests/auth_tests/test_checks.py
+index cfaa4063f8..3bc7ac1e36 100644
+--- a/tests/auth_tests/test_checks.py
++++ b/tests/auth_tests/test_checks.py
+@@ -9,7 +9,7 @@ from django.test import (
+ )
+ from django.test.utils import isolate_apps
+ 
+-from .models import CustomUserNonUniqueUsername
++from .models import CustomUserNonUniqueUsername, CustomUserWithUniqueConstraint
+ 
+ 
+ @isolate_apps('auth_tests', attr_name='apps')
+@@ -85,6 +85,14 @@ class UserModelChecksTests(SimpleTestCase):
+                 ),
+             ])
+ 
++    @override_settings(AUTH_USER_MODEL='auth_tests.CustomUserWithUniqueConstraint')
++    def test_username_unique_with_constraint(self):
++        """
++        A USERNAME_FIELD with a UniqueConstraint should not raise an error.
++        """
++        errors = checks.run_checks()
++        self.assertEqual(errors, [])
++
+     @override_settings(AUTH_USER_MODEL='auth_tests.BadUser')
+     def test_is_anonymous_authenticated_methods(self):
+         """

@@ -2,7 +2,7 @@ from .custom_permissions import CustomPermissionsUser
 from .custom_user import (
     CustomUser, CustomUserWithoutIsActiveField, ExtensionUser,
 )
-from .invalid_models import CustomUserNonUniqueUsername
+from .invalid_models import CustomUserNonUniqueUsername, CustomUserWithUniqueConstraint
 from .is_active import IsActiveTestUser1
 from .minimal import MinimalUser
 from .no_password import NoPasswordUser
@@ -18,8 +18,8 @@ from .with_many_to_many import (
 __all__ = (
     'CustomPermissionsUser', 'CustomUser', 'CustomUserNonUniqueUsername',
     'CustomUserWithFK', 'CustomUserWithM2M', 'CustomUserWithM2MThrough',
-    'CustomUserWithoutIsActiveField', 'Email', 'ExtensionUser',
-    'IntegerUsernameUser', 'IsActiveTestUser1', 'MinimalUser',
+    'CustomUserWithoutIsActiveField', 'CustomUserWithUniqueConstraint', 'Email',
+    'ExtensionUser', 'IntegerUsernameUser', 'IsActiveTestUser1', 'MinimalUser',
     'NoPasswordUser', 'Organization', 'Proxy', 'UUIDUser', 'UserProxy',
     'UserWithDisabledLastLoginField',
 )

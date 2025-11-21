@@ -52,29 +52,37 @@ def check_user_model(app_configs=None, **kwargs):
         )
 
     # Check that the username field is unique
-    if not cls._meta.get_field(cls.USERNAME_FIELD).unique:
-        if (settings.AUTHENTICATION_BACKENDS ==
-                ['django.contrib.auth.backends.ModelBackend']):
-            errors.append(
-                checks.Error(
-                    "'%s.%s' must be unique because it is named as the 'USERNAME_FIELD'." % (
-                        cls._meta.object_name, cls.USERNAME_FIELD
-                    ),
-                    obj=cls,
-                    id='auth.E003',
+    username_field = cls._meta.get_field(cls.USERNAME_FIELD)
+    if not username_field.unique:
+        # Check if there's a UniqueConstraint that covers the USERNAME_FIELD
+        has_unique_constraint = any(
+            cls.USERNAME_FIELD in constraint.fields
+            for constraint in cls._meta.total_unique_constraints
+        )
+        
+        if not has_unique_constraint:
+            if (settings.AUTHENTICATION_BACKENDS ==
+                    ['django.contrib.auth.backends.ModelBackend']):
+                errors.append(
+                    checks.Error(
+                        "'%s.%s' must be unique because it is named as the 'USERNAME_FIELD'." % (
+                            cls._meta.object_name, cls.USERNAME_FIELD
+                        ),
+                        obj=cls,
+                        id='auth.E003',
+                    )
                 )
-            )
-        else:
-            errors.append(
-                checks.Warning(
-                    "'%s.%s' is named as the 'USERNAME_FIELD', but it is not unique." % (
-                        cls._meta.object_name, cls.USERNAME_FIELD
-                    ),
-                    hint='Ensure that your authentication backend(s) can handle non-unique usernames.',
-                    obj=cls,
-                    id='auth.W004',
+            else:
+                errors.append(
+                    checks.Warning(
+                        "'%s.%s' is named as the 'USERNAME_FIELD', but it is not unique." % (
+                            cls._meta.object_name, cls.USERNAME_FIELD
+                        ),
+                        hint='Ensure that your authentication backend(s) can handle non-unique usernames.',
+                        obj=cls,
+                        id='auth.W004',
+                    )
                 )
-            )
 
     if isinstance(cls().is_anonymous, MethodType):
         errors.append(
