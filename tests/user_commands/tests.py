@@ -406,6 +406,15 @@ class CommandTests(SimpleTestCase):
         with self.assertRaisesMessage(CommandError, msg):
             management.call_command("subparser_dest", subcommand="foo", bar=12)
 
+    def test_subparser_missing_required_argument(self):
+        """
+        Subparsers should format errors properly when required arguments are missing.
+        This tests that subparsers inherit error formatting from the parent CommandParser.
+        """
+        msg = "Error: the following arguments are required: name"
+        with self.assertRaisesMessage(CommandError, msg):
+            management.call_command("subparser_error_test", "create")
+
     def test_create_parser_kwargs(self):
         """BaseCommand.create_parser() passes kwargs to CommandParser."""
         epilog = "some epilog text"

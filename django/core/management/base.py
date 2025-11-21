@@ -5,7 +5,7 @@ be executed through ``django-admin`` or ``manage.py``).
 import argparse
 import os
 import sys
-from argparse import ArgumentParser, HelpFormatter
+from argparse import ArgumentParser, HelpFormatter, _SubParsersAction
 from io import TextIOBase
 
 import django
@@ -43,6 +43,35 @@ class SystemCheckError(CommandError):
     pass
 
 
+class _CommandSubParsersAction(_SubParsersAction):
+    """
+    Custom subparsers action that ensures subparsers inherit error formatting
+    arguments from the parent CommandParser.
+    """
+
+    def __init__(self, *args, **kwargs):
+        # Store the parent parser for later use
+        self._parent_parser = kwargs.pop("_parent_parser", None)
+        super().__init__(*args, **kwargs)
+
+    def add_parser(self, name, **kwargs):
+        """
+        Create a subparser and pass error formatting arguments from the parent
+        parser to the subparser.
+        """
+        # Get the parent parser's error formatting arguments
+        if self._parent_parser is not None:
+            kwargs.setdefault(
+                "missing_args_message",
+                self._parent_parser.missing_args_message,
+            )
+            kwargs.setdefault(
+                "called_from_command_line",
+                self._parent_parser.called_from_command_line,
+            )
+        return super().add_parser(name, **kwargs)
+
+
 class CommandParser(ArgumentParser):
     """
     Customized ArgumentParser class to improve some error messages and prevent
@@ -70,6 +99,18 @@ class CommandParser(ArgumentParser):
             super().error(message)
         else:
             raise CommandError("Error: %s" % message)
+
+    def add_subparsers(self, **kwargs):
+        """
+        Create a subparsers action and ensure that subparsers created via
+        add_parser() inherit the error formatting arguments from the parent
+        CommandParser.
+        """
+        # Use a custom subparsers action that passes error formatting arguments
+        kwargs.setdefault("action", _CommandSubParsersAction)
+        # Pass the parent parser to the action so it can access error formatting args
+        kwargs["_parent_parser"] = self
+        return super().add_subparsers(**kwargs)
 
 
 def handle_default_options(options):

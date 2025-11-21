@@ -1,0 +1,88 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index abc6f79a15..967829964f 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -5,7 +5,7 @@ be executed through ``django-admin`` or ``manage.py``).
+ import argparse
+ import os
+ import sys
+-from argparse import ArgumentParser, HelpFormatter
++from argparse import ArgumentParser, HelpFormatter, _SubParsersAction
+ from io import TextIOBase
+ 
+ import django
+@@ -43,6 +43,35 @@ class SystemCheckError(CommandError):
+     pass
+ 
+ 
++class _CommandSubParsersAction(_SubParsersAction):
++    """
++    Custom subparsers action that ensures subparsers inherit error formatting
++    arguments from the parent CommandParser.
++    """
++
++    def __init__(self, *args, **kwargs):
++        # Store the parent parser for later use
++        self._parent_parser = kwargs.pop("_parent_parser", None)
++        super().__init__(*args, **kwargs)
++
++    def add_parser(self, name, **kwargs):
++        """
++        Create a subparser and pass error formatting arguments from the parent
++        parser to the subparser.
++        """
++        # Get the parent parser's error formatting arguments
++        if self._parent_parser is not None:
++            kwargs.setdefault(
++                "missing_args_message",
++                self._parent_parser.missing_args_message,
++            )
++            kwargs.setdefault(
++                "called_from_command_line",
++                self._parent_parser.called_from_command_line,
++            )
++        return super().add_parser(name, **kwargs)
++
++
+ class CommandParser(ArgumentParser):
+     """
+     Customized ArgumentParser class to improve some error messages and prevent
+@@ -71,6 +100,18 @@ class CommandParser(ArgumentParser):
+         else:
+             raise CommandError("Error: %s" % message)
+ 
++    def add_subparsers(self, **kwargs):
++        """
++        Create a subparsers action and ensure that subparsers created via
++        add_parser() inherit the error formatting arguments from the parent
++        CommandParser.
++        """
++        # Use a custom subparsers action that passes error formatting arguments
++        kwargs.setdefault("action", _CommandSubParsersAction)
++        # Pass the parent parser to the action so it can access error formatting args
++        kwargs["_parent_parser"] = self
++        return super().add_subparsers(**kwargs)
++
+ 
+ def handle_default_options(options):
+     """
+diff --git a/tests/user_commands/tests.py b/tests/user_commands/tests.py
+index e40632385c..6050883912 100644
+--- a/tests/user_commands/tests.py
++++ b/tests/user_commands/tests.py
+@@ -406,6 +406,15 @@ class CommandTests(SimpleTestCase):
+         with self.assertRaisesMessage(CommandError, msg):
+             management.call_command("subparser_dest", subcommand="foo", bar=12)
+ 
++    def test_subparser_missing_required_argument(self):
++        """
++        Subparsers should format errors properly when required arguments are missing.
++        This tests that subparsers inherit error formatting from the parent CommandParser.
++        """
++        msg = "Error: the following arguments are required: name"
++        with self.assertRaisesMessage(CommandError, msg):
++            management.call_command("subparser_error_test", "create")
++
+     def test_create_parser_kwargs(self):
+         """BaseCommand.create_parser() passes kwargs to CommandParser."""
+         epilog = "some epilog text"
