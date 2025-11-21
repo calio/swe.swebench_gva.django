@@ -516,7 +516,11 @@ class CheckReferrerPolicyTest(SimpleTestCase):
         SECURE_REFERRER_POLICY=None,
     )
     def test_no_referrer_policy(self):
-        self.assertEqual(self.func(None), [base.W022])
+        """
+        Explicitly setting SECURE_REFERRER_POLICY to None should not raise a warning
+        since the default is now 'same-origin'.
+        """
+        self.assertEqual(self.func(None), [])
 
     @override_settings(MIDDLEWARE=[], SECURE_REFERRER_POLICY=None)
     def test_no_referrer_policy_no_middleware(self):

@@ -452,6 +452,11 @@ Miscellaneous
 * Providing a non-local remote field in the :attr:`.ForeignKey.to_field`
   argument now raises :class:`~django.core.exceptions.FieldError`.
 
+* The default value of the :setting:`SECURE_REFERRER_POLICY` setting is changed
+  from ``None`` to ``'same-origin'``. This improves privacy by default for Django
+  applications. If you need the previous behavior, explicitly set
+  ``SECURE_REFERRER_POLICY = None`` in your settings.
+
 .. _deprecated-features-3.1:
 
 Features deprecated in 3.1
