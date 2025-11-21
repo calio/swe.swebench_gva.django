@@ -1,0 +1,83 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index 0c3a981290..bc6e609c47 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -95,7 +95,7 @@ class DjangoHelpFormatter(HelpFormatter):
+     """
+     show_last = {
+         '--version', '--verbosity', '--traceback', '--settings', '--pythonpath',
+-        '--no-color', '--force-color',
++        '--no-color', '--force-color', '--skip-checks',
+     }
+ 
+     def _reordered_actions(self, actions):
+@@ -223,7 +223,7 @@ class BaseCommand:
+     requires_system_checks = True
+     # Arguments, common to all commands, which aren't defined by the argument
+     # parser.
+-    base_stealth_options = ('skip_checks', 'stderr', 'stdout')
++    base_stealth_options = ('stderr', 'stdout')
+     # Command-specific options not defined by the argument parser.
+     stealth_options = ()
+ 
+@@ -286,6 +286,10 @@ class BaseCommand:
+             '--force-color', action='store_true',
+             help='Force colorization of the command output.',
+         )
++        parser.add_argument(
++            '--skip-checks', action='store_true', dest='skip_checks',
++            help='Skip system checks.',
++        )
+         self.add_arguments(parser)
+         return parser
+ 
+diff --git a/tests/user_commands/tests.py b/tests/user_commands/tests.py
+index 2d1f8f834d..82d8237f73 100644
+--- a/tests/user_commands/tests.py
++++ b/tests/user_commands/tests.py
+@@ -229,6 +229,28 @@ class CommandTests(SimpleTestCase):
+         parser = BaseCommand().create_parser('prog_name', 'subcommand', epilog=epilog)
+         self.assertEqual(parser.epilog, epilog)
+ 
++    def test_skip_checks_option_via_cli(self):
++        """
++        The --skip-checks option should skip system checks when running
++        a command from the command line via ManagementUtility.
++        """
++        self.counter = 0
++
++        def patched_check(self_, **kwargs):
++            self.counter += 1
++
++        saved_check = BaseCommand.check
++        BaseCommand.check = patched_check
++        try:
++            # Running with --skip-checks should not call check()
++            management.ManagementUtility(['manage.py', 'dance', '--skip-checks']).execute()
++            self.assertEqual(self.counter, 0)
++            # Running without --skip-checks should call check()
++            management.ManagementUtility(['manage.py', 'dance']).execute()
++            self.assertEqual(self.counter, 1)
++        finally:
++            BaseCommand.check = saved_check
++
+ 
+ class CommandRunTests(AdminScriptTestCase):
+     """
+@@ -253,6 +275,16 @@ class CommandRunTests(AdminScriptTestCase):
+         self.assertNoOutput(err)
+         self.assertEqual(out.strip(), 'Set foo')
+ 
++    def test_skip_checks_option(self):
++        """
++        The --skip-checks option should skip system checks when running
++        a command from the command line.
++        """
++        self.write_settings('settings.py', apps=['user_commands'])
++        # This should run without errors even with --skip-checks
++        out, err = self.run_manage(['dance', '--skip-checks'])
++        self.assertNoOutput(err)
++
+ 
+ class UtilsTests(SimpleTestCase):
+ 

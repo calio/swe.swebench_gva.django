@@ -229,6 +229,28 @@ class CommandTests(SimpleTestCase):
         parser = BaseCommand().create_parser('prog_name', 'subcommand', epilog=epilog)
         self.assertEqual(parser.epilog, epilog)
 
+    def test_skip_checks_option_via_cli(self):
+        """
+        The --skip-checks option should skip system checks when running
+        a command from the command line via ManagementUtility.
+        """
+        self.counter = 0
+
+        def patched_check(self_, **kwargs):
+            self.counter += 1
+
+        saved_check = BaseCommand.check
+        BaseCommand.check = patched_check
+        try:
+            # Running with --skip-checks should not call check()
+            management.ManagementUtility(['manage.py', 'dance', '--skip-checks']).execute()
+            self.assertEqual(self.counter, 0)
+            # Running without --skip-checks should call check()
+            management.ManagementUtility(['manage.py', 'dance']).execute()
+            self.assertEqual(self.counter, 1)
+        finally:
+            BaseCommand.check = saved_check
+
 
 class CommandRunTests(AdminScriptTestCase):
     """
@@ -252,6 +274,16 @@ class CommandRunTests(AdminScriptTestCase):
         out, err = self.run_manage(['set_option', '--set', 'foo'])
         self.assertNoOutput(err)
         self.assertEqual(out.strip(), 'Set foo')
+
+    def test_skip_checks_option(self):
+        """
+        The --skip-checks option should skip system checks when running
+        a command from the command line.
+        """
+        self.write_settings('settings.py', apps=['user_commands'])
+        # This should run without errors even with --skip-checks
+        out, err = self.run_manage(['dance', '--skip-checks'])
+        self.assertNoOutput(err)
 
 
 class UtilsTests(SimpleTestCase):
