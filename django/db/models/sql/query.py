@@ -1666,7 +1666,23 @@ class Query(BaseExpression):
             filter_expr = (filter_lhs, OuterRef(filter_rhs.name))
         # Generate the inner query.
         query = Query(self.model)
+        # Copy filtered relations and reset their aliases since they will be
+        # re-created in the new query context.
+        query._filtered_relations = {
+            alias: filtered_relation.clone()
+            for alias, filtered_relation in self._filtered_relations.items()
+        }
+        query.annotations = self.annotations.copy()
         query.add_filter(filter_expr)
+        
+        # If the filter references a FilteredRelation, we need to add the
+        # FilteredRelation's condition to the subquery's WHERE clause.
+        # Extract the FilteredRelation alias from the filter expression.
+        filter_lhs_parts = filter_lhs.split('__')
+        if filter_lhs_parts[0] in query._filtered_relations:
+            filtered_relation = query._filtered_relations[filter_lhs_parts[0]]
+            # Add the FilteredRelation condition to the subquery
+            query.add_q(filtered_relation.condition)
         query.clear_ordering(True)
         # Try to have as simple as possible subquery -> trim leading joins from
         # the subquery.
