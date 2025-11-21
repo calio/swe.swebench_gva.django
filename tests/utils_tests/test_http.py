@@ -328,6 +328,38 @@ class HttpDateProcessingTests(unittest.TestCase):
         parsed = parse_http_date('Sun Nov  6 08:49:37 0037')
         self.assertEqual(datetime.utcfromtimestamp(parsed), datetime(2037, 11, 6, 8, 49, 37))
 
+    def test_parsing_rfc850_two_digit_year_rfc7231_compliant(self):
+        """
+        Test RFC 7231 compliant two-digit year handling.
+        
+        RFC 7231 Section 7.1.1.1 states:
+        "Recipients of a timestamp value in rfc850-date format, which uses a
+        two-digit year, MUST interpret a timestamp that appears to be more
+        than 50 years in the future as representing the most recent year in
+        the past that had the same last two digits."
+        
+        The cutoff should be dynamic based on the current year, not static.
+        
+        The old implementation used a hard-coded cutoff of 70:
+        - years 0-69 → 2000-2069
+        - years 70-99 → 1970-1999
+        
+        This is incorrect. For example, in year 2025:
+        - year 00 should be 2000 (25 years in past, within 50-year window)
+        - year 76 should be 1976 (51 years in future, more than 50 years)
+        """
+        # Test case: year 00 should be 2000 (within 50 years of 2025)
+        parsed = parse_http_date('Sunday, 06-Nov-00 08:49:37 GMT')
+        self.assertEqual(datetime.utcfromtimestamp(parsed).year, 2000)
+        
+        # Test case: year 50 should be 2050 (25 years in future, within 50 years)
+        parsed = parse_http_date('Sunday, 06-Nov-50 08:49:37 GMT')
+        self.assertEqual(datetime.utcfromtimestamp(parsed).year, 2050)
+        
+        # Test case: year 76 should be 1976 (51 years in future, more than 50 years)
+        parsed = parse_http_date('Sunday, 06-Nov-76 08:49:37 GMT')
+        self.assertEqual(datetime.utcfromtimestamp(parsed).year, 1976)
+
 
 class EscapeLeadingSlashesTests(unittest.TestCase):
     def test(self):
