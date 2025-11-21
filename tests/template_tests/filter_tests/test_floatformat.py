@@ -147,3 +147,25 @@ class FunctionTests(SimpleTestCase):
             self.assertEqual(floatformat(15.2042, "-3"), "15.204")
             self.assertEqual(floatformat(Decimal("1.2345"), 2), "1.23")
             self.assertEqual(floatformat(Decimal("15.2042"), -3), "15.204")
+
+    def test_decimal_precision(self):
+        """
+        Test that floatformat preserves precision for Decimal numbers.
+        Regression test for issue where Decimal numbers were converted to float,
+        losing precision.
+        """
+        # Test high-precision Decimal
+        self.assertEqual(
+            floatformat(Decimal("42.12345678901234567890"), 20),
+            "42.12345678901234567890",
+        )
+        # Test another high-precision case
+        self.assertEqual(
+            floatformat(Decimal("1.123456789012345678901234567890"), 30),
+            "1.123456789012345678901234567890",
+        )
+        # Test that rounding still works correctly with Decimal
+        self.assertEqual(
+            floatformat(Decimal("42.12345678901234567890"), 5),
+            "42.12346",
+        )
