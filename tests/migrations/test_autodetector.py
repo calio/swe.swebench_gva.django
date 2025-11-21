@@ -456,6 +456,17 @@ class AutodetectorTests(TestCase):
         "unique_together": {("parent", "knight")},
         "indexes": [models.Index(fields=["parent", "knight"], name='rabbit_circular_fk_index')],
     })
+    # Model states for testing altering a field to a ForeignKey
+    author_with_uuid_field = ModelState("testapp", "Author", [
+        ("id", models.AutoField(primary_key=True)),
+        ("name", models.CharField(max_length=200)),
+        ("other_app_id", models.UUIDField(null=True, blank=True)),
+    ])
+    author_with_fk_to_book = ModelState("testapp", "Author", [
+        ("id", models.AutoField(primary_key=True)),
+        ("name", models.CharField(max_length=200)),
+        ("other_app_id", models.ForeignKey("otherapp.Book", null=True, blank=True, on_delete=models.SET_NULL)),
+    ])
 
     def repr_changes(self, changes, include_dependencies=False):
         output = ""
@@ -2249,6 +2260,22 @@ class AutodetectorTests(TestCase):
         self.assertNumberMigrations(changes, 'testapp', 1)
         self.assertOperationTypes(changes, 'testapp', 0, ["AddField"])
         self.assertOperationAttributes(changes, 'testapp', 0, 0, name="book")
+        self.assertMigrationDependencies(changes, 'testapp', 0, [("otherapp", "__first__")])
+
+    def test_alter_field_to_fk_dependency(self):
+        """
+        Altering a field to a ForeignKey should create a dependency on the
+        related model.
+        """
+        changes = self.get_changes(
+            [self.author_with_uuid_field, self.book],
+            [self.author_with_fk_to_book, self.book]
+        )
+        # Right number/type of migrations?
+        self.assertNumberMigrations(changes, 'testapp', 1)
+        self.assertOperationTypes(changes, 'testapp', 0, ["AlterField"])
+        self.assertOperationAttributes(changes, 'testapp', 0, 0, name="other_app_id")
+        # Check that the migration has a dependency on the Book model in otherapp
         self.assertMigrationDependencies(changes, 'testapp', 0, [("otherapp", "__first__")])
 
     def test_circular_dependency_mixed_addcreate(self):

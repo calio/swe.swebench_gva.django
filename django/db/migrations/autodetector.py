@@ -963,6 +963,10 @@ class MigrationAutodetector:
                             preserve_default = False
                     else:
                         field = new_field
+                    # Determine dependencies for the altered field
+                    dependencies = []
+                    if hasattr(field, 'remote_field') and getattr(field.remote_field, 'model', None):
+                        dependencies = self._get_dependencies_for_foreign_key(field)
                     self.add_operation(
                         app_label,
                         operations.AlterField(
@@ -970,7 +974,8 @@ class MigrationAutodetector:
                             name=field_name,
                             field=field,
                             preserve_default=preserve_default,
-                        )
+                        ),
+                        dependencies=dependencies if dependencies else None,
                     )
                 else:
                     # We cannot alter between m2m and concrete fields
