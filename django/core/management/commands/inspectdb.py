@@ -124,10 +124,24 @@ class Command(BaseCommand):
                             "self" if relations[column_name][1] == table_name
                             else table2model(relations[column_name][1])
                         )
+                        rel_to_field = relations[column_name][0]
+                        # Determine if we need to add to_field parameter
+                        # by checking if the referenced field is the primary key
+                        to_field_param = ''
+                        if rel_to != "self":
+                            # Get the primary key of the related table
+                            try:
+                                rel_table_name = relations[column_name][1]
+                                rel_primary_key = connection.introspection.get_primary_key_column(cursor, rel_table_name)
+                                if rel_to_field != rel_primary_key:
+                                    to_field_param = ", to_field='%s'" % rel_to_field
+                            except Exception:
+                                # If we can't determine the primary key, don't add to_field
+                                pass
                         if rel_to in known_models:
-                            field_type = '%s(%s' % (rel_type, rel_to)
+                            field_type = '%s(%s%s' % (rel_type, rel_to, to_field_param)
                         else:
-                            field_type = "%s('%s'" % (rel_type, rel_to)
+                            field_type = "%s('%s'%s" % (rel_type, rel_to, to_field_param)
                     else:
                         # Calling `get_field_type` to get the field type string and any
                         # additional parameters and notes.

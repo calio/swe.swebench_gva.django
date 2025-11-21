@@ -329,6 +329,18 @@ class InspectDBTestCase(TestCase):
         # The error message depends on the backend
         self.assertIn("# The error was:", output)
 
+    @skipUnlessDBFeature('can_introspect_foreign_keys')
+    def test_foreign_key_to_field(self):
+        """
+        Introspection of foreign keys to non-primary key fields should include
+        the to_field parameter.
+        """
+        out = StringIO()
+        call_command('inspectdb', 'inspectdb_foreignkeytofieldtarget', stdout=out)
+        output = out.getvalue()
+        # The foreign key should reference the specific field, not just the table
+        self.assertIn("to_field='other_id'", output)
+
 
 class InspectDBTransactionalTests(TransactionTestCase):
     available_apps = ['inspectdb']

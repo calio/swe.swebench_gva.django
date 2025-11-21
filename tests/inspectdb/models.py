@@ -109,3 +109,25 @@ class UniqueTogether(models.Model):
             ('from_field', 'field1'),
             ('non_unique', 'non_unique_0'),
         ]
+
+
+class ForeignKeyToField(models.Model):
+    """Model with a unique field that is not the primary key"""
+    other_id = models.IntegerField(unique=True)
+
+    class Meta:
+        db_table = 'inspectdb_foreignkeytofield'
+
+
+class ForeignKeyToFieldTarget(models.Model):
+    """Model with a foreign key to a non-primary key field"""
+    other_id = models.IntegerField()
+    fk_field = models.ForeignKey(
+        ForeignKeyToField,
+        models.CASCADE,
+        to_field='other_id',
+        db_column='fk_other_id'
+    )
+
+    class Meta:
+        db_table = 'inspectdb_foreignkeytofieldtarget'

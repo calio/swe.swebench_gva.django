@@ -1,0 +1,84 @@
+diff --git a/django/core/management/commands/inspectdb.py b/django/core/management/commands/inspectdb.py
+index f9b4bfb477..91ce4a3ef7 100644
+--- a/django/core/management/commands/inspectdb.py
++++ b/django/core/management/commands/inspectdb.py
+@@ -124,10 +124,24 @@ class Command(BaseCommand):
+                             "self" if relations[column_name][1] == table_name
+                             else table2model(relations[column_name][1])
+                         )
++                        rel_to_field = relations[column_name][0]
++                        # Determine if we need to add to_field parameter
++                        # by checking if the referenced field is the primary key
++                        to_field_param = ''
++                        if rel_to != "self":
++                            # Get the primary key of the related table
++                            try:
++                                rel_table_name = relations[column_name][1]
++                                rel_primary_key = connection.introspection.get_primary_key_column(cursor, rel_table_name)
++                                if rel_to_field != rel_primary_key:
++                                    to_field_param = ", to_field='%s'" % rel_to_field
++                            except Exception:
++                                # If we can't determine the primary key, don't add to_field
++                                pass
+                         if rel_to in known_models:
+-                            field_type = '%s(%s' % (rel_type, rel_to)
++                            field_type = '%s(%s%s' % (rel_type, rel_to, to_field_param)
+                         else:
+-                            field_type = "%s('%s'" % (rel_type, rel_to)
++                            field_type = "%s('%s'%s" % (rel_type, rel_to, to_field_param)
+                     else:
+                         # Calling `get_field_type` to get the field type string and any
+                         # additional parameters and notes.
+diff --git a/tests/inspectdb/models.py b/tests/inspectdb/models.py
+index 4d2c224da9..4c67811179 100644
+--- a/tests/inspectdb/models.py
++++ b/tests/inspectdb/models.py
+@@ -109,3 +109,25 @@ class UniqueTogether(models.Model):
+             ('from_field', 'field1'),
+             ('non_unique', 'non_unique_0'),
+         ]
++
++
++class ForeignKeyToField(models.Model):
++    """Model with a unique field that is not the primary key"""
++    other_id = models.IntegerField(unique=True)
++
++    class Meta:
++        db_table = 'inspectdb_foreignkeytofield'
++
++
++class ForeignKeyToFieldTarget(models.Model):
++    """Model with a foreign key to a non-primary key field"""
++    other_id = models.IntegerField()
++    fk_field = models.ForeignKey(
++        ForeignKeyToField,
++        models.CASCADE,
++        to_field='other_id',
++        db_column='fk_other_id'
++    )
++
++    class Meta:
++        db_table = 'inspectdb_foreignkeytofieldtarget'
+diff --git a/tests/inspectdb/tests.py b/tests/inspectdb/tests.py
+index 8be1681106..1ae2559f1e 100644
+--- a/tests/inspectdb/tests.py
++++ b/tests/inspectdb/tests.py
+@@ -329,6 +329,18 @@ class InspectDBTestCase(TestCase):
+         # The error message depends on the backend
+         self.assertIn("# The error was:", output)
+ 
++    @skipUnlessDBFeature('can_introspect_foreign_keys')
++    def test_foreign_key_to_field(self):
++        """
++        Introspection of foreign keys to non-primary key fields should include
++        the to_field parameter.
++        """
++        out = StringIO()
++        call_command('inspectdb', 'inspectdb_foreignkeytofieldtarget', stdout=out)
++        output = out.getvalue()
++        # The foreign key should reference the specific field, not just the table
++        self.assertIn("to_field='other_id'", output)
++
+ 
+ class InspectDBTransactionalTests(TransactionTestCase):
+     available_apps = ['inspectdb']
