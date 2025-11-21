@@ -147,6 +147,30 @@ class ServerHandler(simple_server.ServerHandler):
         self.get_stdin().read()
         super().close()
 
+    def _should_strip_content(self):
+        """
+        Return True if the response content should be stripped for compliance
+        with RFC 9112 Section 6.3. This applies to HEAD requests and responses
+        with status codes 1xx, 204, and 304.
+        """
+        if not self.status:
+            return False
+        status_code = int(self.status.split(" ", 1)[0])
+        return (
+            self.request_handler.command == "HEAD"
+            or 100 <= status_code < 200
+            or status_code in (204, 304)
+        )
+
+    def write(self, data):
+        """
+        Override write to strip content for HEAD requests and special status codes.
+        """
+        if self._should_strip_content():
+            # Don't write any content for HEAD requests or special status codes
+            return
+        super().write(data)
+
 
 class WSGIRequestHandler(simple_server.WSGIRequestHandler):
     protocol_version = "HTTP/1.1"

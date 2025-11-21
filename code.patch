@@ -1,0 +1,242 @@
+diff --git a/django/core/handlers/asgi.py b/django/core/handlers/asgi.py
+index 39e2abe5a9..8081527f94 100644
+--- a/django/core/handlers/asgi.py
++++ b/django/core/handlers/asgi.py
+@@ -177,7 +177,7 @@ class ASGIHandler(base.BaseHandler):
+         request, error_response = self.create_request(scope, body_file)
+         if request is None:
+             body_file.close()
+-            await self.send_response(error_response, send)
++            await self.send_response(error_response, send, None)
+             return
+         # Get the response, using the async mode of BaseHandler.
+         response = await self.get_response_async(request)
+@@ -187,7 +187,7 @@ class ASGIHandler(base.BaseHandler):
+         if isinstance(response, FileResponse):
+             response.block_size = self.chunk_size
+         # Send the response.
+-        await self.send_response(response, send)
++        await self.send_response(response, send, request)
+ 
+     async def read_body(self, receive):
+         """Reads an HTTP body from an ASGI connection."""
+@@ -239,7 +239,7 @@ class ASGIHandler(base.BaseHandler):
+                 content_type="text/plain",
+             )
+ 
+-    async def send_response(self, response, send):
++    async def send_response(self, response, send, request=None):
+         """Encode and send a response out over ASGI."""
+         # Collect cookies into headers. Have to preserve header case as there
+         # are some non-RFC compliant clients that require e.g. Content-Type.
+@@ -262,37 +262,50 @@ class ASGIHandler(base.BaseHandler):
+                 "headers": response_headers,
+             }
+         )
++        # Determine if we should strip the response body for compliance with
++        # RFC 9112 Section 6.3. This applies to HEAD requests and responses
++        # with status codes 1xx, 204, and 304.
++        should_strip_content = (
++            100 <= response.status_code < 200
++            or response.status_code in (204, 304)
++            or (request is not None and request.method == "HEAD")
++        )
+         # Streaming responses need to be pinned to their iterator.
+         if response.streaming:
+             # - Consume via `__aiter__` and not `streaming_content` directly, to
+             #   allow mapping of a sync iterator.
+             # - Use aclosing() when consuming aiter.
+             #   See https://github.com/python/cpython/commit/6e8dcda
+-            async with aclosing(aiter(response)) as content:
+-                async for part in content:
+-                    for chunk, _ in self.chunk_bytes(part):
+-                        await send(
+-                            {
+-                                "type": "http.response.body",
+-                                "body": chunk,
+-                                # Ignore "more" as there may be more parts; instead,
+-                                # use an empty final closing message with False.
+-                                "more_body": True,
+-                            }
+-                        )
++            if not should_strip_content:
++                async with aclosing(aiter(response)) as content:
++                    async for part in content:
++                        for chunk, _ in self.chunk_bytes(part):
++                            await send(
++                                {
++                                    "type": "http.response.body",
++                                    "body": chunk,
++                                    # Ignore "more" as there may be more parts; instead,
++                                    # use an empty final closing message with False.
++                                    "more_body": True,
++                                }
++                            )
+             # Final closing message.
+             await send({"type": "http.response.body"})
+         # Other responses just need chunking.
+         else:
+             # Yield chunks of response.
+-            for chunk, last in self.chunk_bytes(response.content):
+-                await send(
+-                    {
+-                        "type": "http.response.body",
+-                        "body": chunk,
+-                        "more_body": not last,
+-                    }
+-                )
++            if not should_strip_content:
++                for chunk, last in self.chunk_bytes(response.content):
++                    await send(
++                        {
++                            "type": "http.response.body",
++                            "body": chunk,
++                            "more_body": not last,
++                        }
++                    )
++            else:
++                # Send empty body for HEAD requests and special status codes
++                await send({"type": "http.response.body", "body": b""})
+         await sync_to_async(response.close, thread_sensitive=True)()
+ 
+     @classmethod
+diff --git a/django/core/servers/basehttp.py b/django/core/servers/basehttp.py
+index fef5532e58..eabd3135ff 100644
+--- a/django/core/servers/basehttp.py
++++ b/django/core/servers/basehttp.py
+@@ -147,6 +147,30 @@ class ServerHandler(simple_server.ServerHandler):
+         self.get_stdin().read()
+         super().close()
+ 
++    def _should_strip_content(self):
++        """
++        Return True if the response content should be stripped for compliance
++        with RFC 9112 Section 6.3. This applies to HEAD requests and responses
++        with status codes 1xx, 204, and 304.
++        """
++        if not self.status:
++            return False
++        status_code = int(self.status.split(" ", 1)[0])
++        return (
++            self.request_handler.command == "HEAD"
++            or 100 <= status_code < 200
++            or status_code in (204, 304)
++        )
++
++    def write(self, data):
++        """
++        Override write to strip content for HEAD requests and special status codes.
++        """
++        if self._should_strip_content():
++            # Don't write any content for HEAD requests or special status codes
++            return
++        super().write(data)
++
+ 
+ class WSGIRequestHandler(simple_server.WSGIRequestHandler):
+     protocol_version = "HTTP/1.1"
+diff --git a/tests/servers/test_basehttp.py b/tests/servers/test_basehttp.py
+index a837505feb..02290320bc 100644
+--- a/tests/servers/test_basehttp.py
++++ b/tests/servers/test_basehttp.py
+@@ -106,6 +106,100 @@ class WSGIRequestHandlerTestCase(SimpleTestCase):
+ 
+         self.assertEqual(body, b"HTTP_SOME_HEADER:good")
+ 
++    def test_head_request_strips_body(self):
++        """WSGIRequestHandler strips response body for HEAD requests."""
++
++        def test_app(environ, start_response):
++            """A WSGI app that returns a response body."""
++            start_response("200 OK", [("Content-Type", "text/plain")])
++            return [b"Hello World"]
++
++        rfile = BytesIO()
++        rfile.write(b"HEAD / HTTP/1.0\r\n")
++        rfile.seek(0)
++
++        # WSGIRequestHandler closes the output file; we need to make this a
++        # no-op so we can still read its contents.
++        class UnclosableBytesIO(BytesIO):
++            def close(self):
++                pass
++
++        wfile = UnclosableBytesIO()
++
++        def makefile(mode, *a, **kw):
++            if mode == "rb":
++                return rfile
++            elif mode == "wb":
++                return wfile
++
++        request = Stub(makefile=makefile)
++        server = Stub(base_environ={}, get_app=lambda: test_app)
++
++        # Prevent logging from appearing in test output.
++        with self.assertLogs("django.server", "INFO"):
++            # instantiating a handler runs the request as side effect
++            WSGIRequestHandler(request, "192.168.0.2", server)
++
++        wfile.seek(0)
++        response = wfile.read()
++
++        # Response should contain headers but not the body
++        self.assertIn(b"200 OK", response)
++        self.assertNotIn(b"Hello World", response)
++
++    def test_special_status_codes_strip_body(self):
++        """WSGIRequestHandler strips response body for 1xx, 204, and 304 responses."""
++        test_cases = [
++            (100, b"100 Continue"),
++            (101, b"101 Switching Protocols"),
++            (204, b"204 No Content"),
++            (304, b"304 Not Modified"),
++        ]
++
++        for status_code, status_line in test_cases:
++            with self.subTest(status_code=status_code):
++
++                def test_app(environ, start_response):
++                    """A WSGI app that returns a response body."""
++                    start_response(
++                        f"{status_code} {status_line.decode().split(' ', 1)[1]}",
++                        [("Content-Type", "text/plain")],
++                    )
++                    return [b"Response Body"]
++
++                rfile = BytesIO()
++                rfile.write(b"GET / HTTP/1.0\r\n")
++                rfile.seek(0)
++
++                # WSGIRequestHandler closes the output file; we need to make this a
++                # no-op so we can still read its contents.
++                class UnclosableBytesIO(BytesIO):
++                    def close(self):
++                        pass
++
++                wfile = UnclosableBytesIO()
++
++                def makefile(mode, *a, **kw):
++                    if mode == "rb":
++                        return rfile
++                    elif mode == "wb":
++                        return wfile
++
++                request = Stub(makefile=makefile)
++                server = Stub(base_environ={}, get_app=lambda: test_app)
++
++                # Prevent logging from appearing in test output.
++                with self.assertLogs("django.server", "INFO"):
++                    # instantiating a handler runs the request as side effect
++                    WSGIRequestHandler(request, "192.168.0.2", server)
++
++                wfile.seek(0)
++                response = wfile.read()
++
++                # Response should contain status line but not the body
++                self.assertIn(status_line, response)
++                self.assertNotIn(b"Response Body", response)
++
+ 
+ class WSGIServerTestCase(SimpleTestCase):
+     request_factory = RequestFactory()

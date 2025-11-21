@@ -177,7 +177,7 @@ class ASGIHandler(base.BaseHandler):
         request, error_response = self.create_request(scope, body_file)
         if request is None:
             body_file.close()
-            await self.send_response(error_response, send)
+            await self.send_response(error_response, send, None)
             return
         # Get the response, using the async mode of BaseHandler.
         response = await self.get_response_async(request)
@@ -187,7 +187,7 @@ class ASGIHandler(base.BaseHandler):
         if isinstance(response, FileResponse):
             response.block_size = self.chunk_size
         # Send the response.
-        await self.send_response(response, send)
+        await self.send_response(response, send, request)
 
     async def read_body(self, receive):
         """Reads an HTTP body from an ASGI connection."""
@@ -239,7 +239,7 @@ class ASGIHandler(base.BaseHandler):
                 content_type="text/plain",
             )
 
-    async def send_response(self, response, send):
+    async def send_response(self, response, send, request=None):
         """Encode and send a response out over ASGI."""
         # Collect cookies into headers. Have to preserve header case as there
         # are some non-RFC compliant clients that require e.g. Content-Type.
@@ -262,37 +262,50 @@ class ASGIHandler(base.BaseHandler):
                 "headers": response_headers,
             }
         )
+        # Determine if we should strip the response body for compliance with
+        # RFC 9112 Section 6.3. This applies to HEAD requests and responses
+        # with status codes 1xx, 204, and 304.
+        should_strip_content = (
+            100 <= response.status_code < 200
+            or response.status_code in (204, 304)
+            or (request is not None and request.method == "HEAD")
+        )
         # Streaming responses need to be pinned to their iterator.
         if response.streaming:
             # - Consume via `__aiter__` and not `streaming_content` directly, to
             #   allow mapping of a sync iterator.
             # - Use aclosing() when consuming aiter.
             #   See https://github.com/python/cpython/commit/6e8dcda
-            async with aclosing(aiter(response)) as content:
-                async for part in content:
-                    for chunk, _ in self.chunk_bytes(part):
-                        await send(
-                            {
-                                "type": "http.response.body",
-                                "body": chunk,
-                                # Ignore "more" as there may be more parts; instead,
-                                # use an empty final closing message with False.
-                                "more_body": True,
-                            }
-                        )
+            if not should_strip_content:
+                async with aclosing(aiter(response)) as content:
+                    async for part in content:
+                        for chunk, _ in self.chunk_bytes(part):
+                            await send(
+                                {
+                                    "type": "http.response.body",
+                                    "body": chunk,
+                                    # Ignore "more" as there may be more parts; instead,
+                                    # use an empty final closing message with False.
+                                    "more_body": True,
+                                }
+                            )
             # Final closing message.
             await send({"type": "http.response.body"})
         # Other responses just need chunking.
         else:
             # Yield chunks of response.
-            for chunk, last in self.chunk_bytes(response.content):
-                await send(
-                    {
-                        "type": "http.response.body",
-                        "body": chunk,
-                        "more_body": not last,
-                    }
-                )
+            if not should_strip_content:
+                for chunk, last in self.chunk_bytes(response.content):
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": chunk,
+                            "more_body": not last,
+                        }
+                    )
+            else:
+                # Send empty body for HEAD requests and special status codes
+                await send({"type": "http.response.body", "body": b""})
         await sync_to_async(response.close, thread_sensitive=True)()
 
     @classmethod

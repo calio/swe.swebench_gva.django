@@ -106,6 +106,100 @@ class WSGIRequestHandlerTestCase(SimpleTestCase):
 
         self.assertEqual(body, b"HTTP_SOME_HEADER:good")
 
+    def test_head_request_strips_body(self):
+        """WSGIRequestHandler strips response body for HEAD requests."""
+
+        def test_app(environ, start_response):
+            """A WSGI app that returns a response body."""
+            start_response("200 OK", [("Content-Type", "text/plain")])
+            return [b"Hello World"]
+
+        rfile = BytesIO()
+        rfile.write(b"HEAD / HTTP/1.0\r\n")
+        rfile.seek(0)
+
+        # WSGIRequestHandler closes the output file; we need to make this a
+        # no-op so we can still read its contents.
+        class UnclosableBytesIO(BytesIO):
+            def close(self):
+                pass
+
+        wfile = UnclosableBytesIO()
+
+        def makefile(mode, *a, **kw):
+            if mode == "rb":
+                return rfile
+            elif mode == "wb":
+                return wfile
+
+        request = Stub(makefile=makefile)
+        server = Stub(base_environ={}, get_app=lambda: test_app)
+
+        # Prevent logging from appearing in test output.
+        with self.assertLogs("django.server", "INFO"):
+            # instantiating a handler runs the request as side effect
+            WSGIRequestHandler(request, "192.168.0.2", server)
+
+        wfile.seek(0)
+        response = wfile.read()
+
+        # Response should contain headers but not the body
+        self.assertIn(b"200 OK", response)
+        self.assertNotIn(b"Hello World", response)
+
+    def test_special_status_codes_strip_body(self):
+        """WSGIRequestHandler strips response body for 1xx, 204, and 304 responses."""
+        test_cases = [
+            (100, b"100 Continue"),
+            (101, b"101 Switching Protocols"),
+            (204, b"204 No Content"),
+            (304, b"304 Not Modified"),
+        ]
+
+        for status_code, status_line in test_cases:
+            with self.subTest(status_code=status_code):
+
+                def test_app(environ, start_response):
+                    """A WSGI app that returns a response body."""
+                    start_response(
+                        f"{status_code} {status_line.decode().split(' ', 1)[1]}",
+                        [("Content-Type", "text/plain")],
+                    )
+                    return [b"Response Body"]
+
+                rfile = BytesIO()
+                rfile.write(b"GET / HTTP/1.0\r\n")
+                rfile.seek(0)
+
+                # WSGIRequestHandler closes the output file; we need to make this a
+                # no-op so we can still read its contents.
+                class UnclosableBytesIO(BytesIO):
+                    def close(self):
+                        pass
+
+                wfile = UnclosableBytesIO()
+
+                def makefile(mode, *a, **kw):
+                    if mode == "rb":
+                        return rfile
+                    elif mode == "wb":
+                        return wfile
+
+                request = Stub(makefile=makefile)
+                server = Stub(base_environ={}, get_app=lambda: test_app)
+
+                # Prevent logging from appearing in test output.
+                with self.assertLogs("django.server", "INFO"):
+                    # instantiating a handler runs the request as side effect
+                    WSGIRequestHandler(request, "192.168.0.2", server)
+
+                wfile.seek(0)
+                response = wfile.read()
+
+                # Response should contain status line but not the body
+                self.assertIn(status_line, response)
+                self.assertNotIn(b"Response Body", response)
+
 
 class WSGIServerTestCase(SimpleTestCase):
     request_factory = RequestFactory()
