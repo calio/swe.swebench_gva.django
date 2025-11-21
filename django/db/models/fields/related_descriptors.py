@@ -145,7 +145,19 @@ class ForwardManyToOneDescriptor:
             }
         else:
             query = {"%s__in" % self.field.related_query_name(): instances}
+        
+        # Store slice limits if present, then clear them before filtering
+        # to avoid "Cannot filter a query once a slice has been taken" error
+        low_mark = queryset.query.low_mark
+        high_mark = queryset.query.high_mark
+        if queryset.query.is_sliced:
+            queryset.query.clear_limits()
+        
         queryset = queryset.filter(**query)
+        
+        # Re-apply slice limits if they were present
+        if low_mark != 0 or high_mark is not None:
+            queryset.query.set_limits(low_mark, high_mark)
 
         # Since we're going to assign directly in the cache,
         # we must manage the reverse relation cache manually.
@@ -404,7 +416,19 @@ class ReverseOneToOneDescriptor:
         instance_attr = self.related.field.get_foreign_related_value
         instances_dict = {instance_attr(inst): inst for inst in instances}
         query = {"%s__in" % self.related.field.name: instances}
+        
+        # Store slice limits if present, then clear them before filtering
+        # to avoid "Cannot filter a query once a slice has been taken" error
+        low_mark = queryset.query.low_mark
+        high_mark = queryset.query.high_mark
+        if queryset.query.is_sliced:
+            queryset.query.clear_limits()
+        
         queryset = queryset.filter(**query)
+        
+        # Re-apply slice limits if they were present
+        if low_mark != 0 or high_mark is not None:
+            queryset.query.set_limits(low_mark, high_mark)
 
         # Since we're going to assign directly in the cache,
         # we must manage the reverse relation cache manually.
@@ -719,7 +743,19 @@ def create_reverse_many_to_one_manager(superclass, rel):
             instance_attr = self.field.get_foreign_related_value
             instances_dict = {instance_attr(inst): inst for inst in instances}
             query = {"%s__in" % self.field.name: instances}
+            
+            # Store slice limits if present, then clear them before filtering
+            # to avoid "Cannot filter a query once a slice has been taken" error
+            low_mark = queryset.query.low_mark
+            high_mark = queryset.query.high_mark
+            if queryset.query.is_sliced:
+                queryset.query.clear_limits()
+            
             queryset = queryset.filter(**query)
+            
+            # Re-apply slice limits if they were present
+            if low_mark != 0 or high_mark is not None:
+                queryset.query.set_limits(low_mark, high_mark)
 
             # Since we just bypassed this class' get_queryset(), we must manage
             # the reverse relation manually.
@@ -1052,6 +1088,15 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
             queryset = queryset.using(queryset._db or self._db)
 
             query = {"%s__in" % self.query_field_name: instances}
+            
+            # Store slice limits if present, then clear them before filtering
+            # to avoid "Cannot filter a query once a slice has been taken" error
+            low_mark = queryset.query.low_mark
+            high_mark = queryset.query.high_mark
+            if queryset.query.is_sliced:
+                queryset.query.clear_limits()
+            
+            queryset._defer_next_filter = True
             queryset = queryset._next_is_sticky().filter(**query)
 
             # M2M: need to annotate the query in order to get the primary model
@@ -1073,6 +1118,10 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
                     for f in fk.local_related_fields
                 }
             )
+            
+            # Re-apply slice limits if they were present
+            if low_mark != 0 or high_mark is not None:
+                queryset.query.set_limits(low_mark, high_mark)
             return (
                 queryset,
                 lambda result: tuple(

@@ -1908,3 +1908,62 @@ class NestedPrefetchTests(TestCase):
         self.assertIs(Room.house.is_cached(self.room), True)
         with self.assertNumQueries(0):
             house.rooms.first().house.address
+
+    def test_prefetch_with_slice(self):
+        """Test that Prefetch works with sliced querysets."""
+        # Create test data with multiple authors per book
+        book = Book.objects.create(title="Test Book")
+        author1 = Author.objects.create(name="Author 1", first_book=book)
+        author2 = Author.objects.create(name="Author 2", first_book=book)
+        author3 = Author.objects.create(name="Author 3", first_book=book)
+        author4 = Author.objects.create(name="Author 4", first_book=book)
+        book.authors.add(author1, author2, author3, author4)
+
+        # Test that Prefetch with slice works
+        result = list(
+            Book.objects.prefetch_related(
+                Prefetch(
+                    "authors",
+                    queryset=Author.objects.all()[:2],
+                    to_attr="example_authors",
+                )
+            )
+        )
+
+        # Should have 1 book
+        self.assertEqual(len(result), 1)
+
+        # Book should have 2 example authors (sliced to 2)
+        self.assertEqual(len(result[0].example_authors), 2)
+
+    def test_prefetch_with_slice_reverse_fk(self):
+        """Test that Prefetch works with sliced querysets on reverse FK."""
+        # Create test data with multiple books per author
+        book_temp = Book.objects.create(title="Temp Book")
+        author = Author.objects.create(name="Test Author", first_book=book_temp)
+        book1 = Book.objects.create(title="Book 1")
+        book2 = Book.objects.create(title="Book 2")
+        book3 = Book.objects.create(title="Book 3")
+        book4 = Book.objects.create(title="Book 4")
+        book1.authors.add(author)
+        book2.authors.add(author)
+        book3.authors.add(author)
+        book4.authors.add(author)
+
+        # Test that Prefetch with slice works on reverse FK
+        result = list(
+            Author.objects.prefetch_related(
+                Prefetch(
+                    "books",
+                    queryset=Book.objects.all()[:2],
+                    to_attr="example_books",
+                )
+            )
+        )
+
+        # Should have at least 1 author
+        self.assertGreaterEqual(len(result), 1)
+
+        # Author should have 2 example books (sliced to 2)
+        author_result = [a for a in result if a.name == "Test Author"][0]
+        self.assertEqual(len(author_result.example_books), 2)

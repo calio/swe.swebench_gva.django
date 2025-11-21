@@ -1,0 +1,178 @@
+diff --git a/django/db/models/fields/related_descriptors.py b/django/db/models/fields/related_descriptors.py
+index b192df4fbf..08cc0952d1 100644
+--- a/django/db/models/fields/related_descriptors.py
++++ b/django/db/models/fields/related_descriptors.py
+@@ -145,7 +145,19 @@ class ForwardManyToOneDescriptor:
+             }
+         else:
+             query = {"%s__in" % self.field.related_query_name(): instances}
++        
++        # Store slice limits if present, then clear them before filtering
++        # to avoid "Cannot filter a query once a slice has been taken" error
++        low_mark = queryset.query.low_mark
++        high_mark = queryset.query.high_mark
++        if queryset.query.is_sliced:
++            queryset.query.clear_limits()
++        
+         queryset = queryset.filter(**query)
++        
++        # Re-apply slice limits if they were present
++        if low_mark != 0 or high_mark is not None:
++            queryset.query.set_limits(low_mark, high_mark)
+ 
+         # Since we're going to assign directly in the cache,
+         # we must manage the reverse relation cache manually.
+@@ -404,7 +416,19 @@ class ReverseOneToOneDescriptor:
+         instance_attr = self.related.field.get_foreign_related_value
+         instances_dict = {instance_attr(inst): inst for inst in instances}
+         query = {"%s__in" % self.related.field.name: instances}
++        
++        # Store slice limits if present, then clear them before filtering
++        # to avoid "Cannot filter a query once a slice has been taken" error
++        low_mark = queryset.query.low_mark
++        high_mark = queryset.query.high_mark
++        if queryset.query.is_sliced:
++            queryset.query.clear_limits()
++        
+         queryset = queryset.filter(**query)
++        
++        # Re-apply slice limits if they were present
++        if low_mark != 0 or high_mark is not None:
++            queryset.query.set_limits(low_mark, high_mark)
+ 
+         # Since we're going to assign directly in the cache,
+         # we must manage the reverse relation cache manually.
+@@ -719,7 +743,19 @@ def create_reverse_many_to_one_manager(superclass, rel):
+             instance_attr = self.field.get_foreign_related_value
+             instances_dict = {instance_attr(inst): inst for inst in instances}
+             query = {"%s__in" % self.field.name: instances}
++            
++            # Store slice limits if present, then clear them before filtering
++            # to avoid "Cannot filter a query once a slice has been taken" error
++            low_mark = queryset.query.low_mark
++            high_mark = queryset.query.high_mark
++            if queryset.query.is_sliced:
++                queryset.query.clear_limits()
++            
+             queryset = queryset.filter(**query)
++            
++            # Re-apply slice limits if they were present
++            if low_mark != 0 or high_mark is not None:
++                queryset.query.set_limits(low_mark, high_mark)
+ 
+             # Since we just bypassed this class' get_queryset(), we must manage
+             # the reverse relation manually.
+@@ -1052,6 +1088,15 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
+             queryset = queryset.using(queryset._db or self._db)
+ 
+             query = {"%s__in" % self.query_field_name: instances}
++            
++            # Store slice limits if present, then clear them before filtering
++            # to avoid "Cannot filter a query once a slice has been taken" error
++            low_mark = queryset.query.low_mark
++            high_mark = queryset.query.high_mark
++            if queryset.query.is_sliced:
++                queryset.query.clear_limits()
++            
++            queryset._defer_next_filter = True
+             queryset = queryset._next_is_sticky().filter(**query)
+ 
+             # M2M: need to annotate the query in order to get the primary model
+@@ -1073,6 +1118,10 @@ def create_forward_many_to_many_manager(superclass, rel, reverse):
+                     for f in fk.local_related_fields
+                 }
+             )
++            
++            # Re-apply slice limits if they were present
++            if low_mark != 0 or high_mark is not None:
++                queryset.query.set_limits(low_mark, high_mark)
+             return (
+                 queryset,
+                 lambda result: tuple(
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index be0deb90b0..c1a394ff90 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1438,13 +1438,13 @@ class QuerySet:
+         return self._filter_or_exclude(True, args, kwargs)
+ 
+     def _filter_or_exclude(self, negate, args, kwargs):
+-        if (args or kwargs) and self.query.is_sliced:
+-            raise TypeError("Cannot filter a query once a slice has been taken.")
+         clone = self._chain()
+         if self._defer_next_filter:
+             self._defer_next_filter = False
+             clone._deferred_filter = negate, args, kwargs
+         else:
++            if (args or kwargs) and self.query.is_sliced:
++                raise TypeError("Cannot filter a query once a slice has been taken.")
+             clone._filter_or_exclude_inplace(negate, args, kwargs)
+         return clone
+ 
+diff --git a/tests/prefetch_related/tests.py b/tests/prefetch_related/tests.py
+index 1ac17fde73..67b3731011 100644
+--- a/tests/prefetch_related/tests.py
++++ b/tests/prefetch_related/tests.py
+@@ -1908,3 +1908,62 @@ class NestedPrefetchTests(TestCase):
+         self.assertIs(Room.house.is_cached(self.room), True)
+         with self.assertNumQueries(0):
+             house.rooms.first().house.address
++
++    def test_prefetch_with_slice(self):
++        """Test that Prefetch works with sliced querysets."""
++        # Create test data with multiple authors per book
++        book = Book.objects.create(title="Test Book")
++        author1 = Author.objects.create(name="Author 1", first_book=book)
++        author2 = Author.objects.create(name="Author 2", first_book=book)
++        author3 = Author.objects.create(name="Author 3", first_book=book)
++        author4 = Author.objects.create(name="Author 4", first_book=book)
++        book.authors.add(author1, author2, author3, author4)
++
++        # Test that Prefetch with slice works
++        result = list(
++            Book.objects.prefetch_related(
++                Prefetch(
++                    "authors",
++                    queryset=Author.objects.all()[:2],
++                    to_attr="example_authors",
++                )
++            )
++        )
++
++        # Should have 1 book
++        self.assertEqual(len(result), 1)
++
++        # Book should have 2 example authors (sliced to 2)
++        self.assertEqual(len(result[0].example_authors), 2)
++
++    def test_prefetch_with_slice_reverse_fk(self):
++        """Test that Prefetch works with sliced querysets on reverse FK."""
++        # Create test data with multiple books per author
++        book_temp = Book.objects.create(title="Temp Book")
++        author = Author.objects.create(name="Test Author", first_book=book_temp)
++        book1 = Book.objects.create(title="Book 1")
++        book2 = Book.objects.create(title="Book 2")
++        book3 = Book.objects.create(title="Book 3")
++        book4 = Book.objects.create(title="Book 4")
++        book1.authors.add(author)
++        book2.authors.add(author)
++        book3.authors.add(author)
++        book4.authors.add(author)
++
++        # Test that Prefetch with slice works on reverse FK
++        result = list(
++            Author.objects.prefetch_related(
++                Prefetch(
++                    "books",
++                    queryset=Book.objects.all()[:2],
++                    to_attr="example_books",
++                )
++            )
++        )
++
++        # Should have at least 1 author
++        self.assertGreaterEqual(len(result), 1)
++
++        # Author should have 2 example books (sliced to 2)
++        author_result = [a for a in result if a.name == "Test Author"][0]
++        self.assertEqual(len(author_result.example_books), 2)
