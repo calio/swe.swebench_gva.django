@@ -1,0 +1,48 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 92fe4affb9..3a462f1c4c 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -277,6 +277,7 @@ class Collector:
+             if self.can_fast_delete(instance):
+                 with transaction.mark_for_rollback_on_error():
+                     count = sql.DeleteQuery(model).delete_batch([instance.pk], self.using)
++                setattr(instance, model._meta.pk.attname, None)
+                 return count, {model._meta.label: count}
+ 
+         with transaction.atomic(using=self.using, savepoint=False):
+diff --git a/tests/delete/tests.py b/tests/delete/tests.py
+index 55eeb226ea..1d62ff2e5b 100644
+--- a/tests/delete/tests.py
++++ b/tests/delete/tests.py
+@@ -208,6 +208,31 @@ class DeletionTests(TestCase):
+ 
+         models.signals.pre_delete.disconnect(pre_delete)
+ 
++    def test_fast_delete_clears_pk(self):
++        """
++        Test that deleting a model instance with no dependencies
++        (fast delete path) clears the PK to None.
++        """
++        # Avatar has no dependencies, so it uses the fast delete path
++        avatar = Avatar.objects.create(desc='test')
++        avatar_pk = avatar.pk
++        self.assertIsNotNone(avatar_pk)
++        
++        avatar.delete()
++        
++        # PK should be cleared after deletion
++        self.assertIsNone(avatar.pk)
++        
++        # M2MTo also has no dependencies
++        m2m_to = M2MTo.objects.create()
++        m2m_to_pk = m2m_to.pk
++        self.assertIsNotNone(m2m_to_pk)
++        
++        m2m_to.delete()
++        
++        # PK should be cleared after deletion
++        self.assertIsNone(m2m_to.pk)
++
+     def test_deletion_order(self):
+         pre_delete_order = []
+         post_delete_order = []

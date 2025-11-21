@@ -208,6 +208,31 @@ class DeletionTests(TestCase):
 
         models.signals.pre_delete.disconnect(pre_delete)
 
+    def test_fast_delete_clears_pk(self):
+        """
+        Test that deleting a model instance with no dependencies
+        (fast delete path) clears the PK to None.
+        """
+        # Avatar has no dependencies, so it uses the fast delete path
+        avatar = Avatar.objects.create(desc='test')
+        avatar_pk = avatar.pk
+        self.assertIsNotNone(avatar_pk)
+        
+        avatar.delete()
+        
+        # PK should be cleared after deletion
+        self.assertIsNone(avatar.pk)
+        
+        # M2MTo also has no dependencies
+        m2m_to = M2MTo.objects.create()
+        m2m_to_pk = m2m_to.pk
+        self.assertIsNotNone(m2m_to_pk)
+        
+        m2m_to.delete()
+        
+        # PK should be cleared after deletion
+        self.assertIsNone(m2m_to.pk)
+
     def test_deletion_order(self):
         pre_delete_order = []
         post_delete_order = []
