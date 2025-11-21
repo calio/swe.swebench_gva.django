@@ -1145,6 +1145,28 @@ class ResolverMatchTests(SimpleTestCase):
             "namespaces=[], route=^no_kwargs/([0-9]+)/([0-9]+)/$)",
         )
 
+    @override_settings(ROOT_URLCONF='urlpatterns_reverse.urls')
+    def test_repr_with_partial(self):
+        # Test that functools.partial views are unwrapped in __repr__
+        match = resolve('/partial/')
+        self.assertEqual(
+            repr(match),
+            "ResolverMatch(func=urlpatterns_reverse.views.empty_view, "
+            "args=(), kwargs={}, url_name=partial, app_names=[], "
+            "namespaces=[], route=partial/)",
+        )
+
+    @override_settings(ROOT_URLCONF='urlpatterns_reverse.urls')
+    def test_repr_with_nested_partial(self):
+        # Test that nested functools.partial views are unwrapped in __repr__
+        match = resolve('/partial_nested/')
+        self.assertEqual(
+            repr(match),
+            "ResolverMatch(func=urlpatterns_reverse.views.empty_view, "
+            "args=(), kwargs={}, url_name=partial_nested, app_names=[], "
+            "namespaces=[], route=partial_nested/)",
+        )
+
 
 @override_settings(ROOT_URLCONF='urlpatterns_reverse.erroneous_urls')
 class ErroneousViewTests(SimpleTestCase):
