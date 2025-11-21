@@ -621,6 +621,27 @@ class SelectDateWidgetTest(WidgetTest):
                     self.widget.value_from_datadict(data, {}, "field"), expected
                 )
 
+    def test_value_from_datadict_overflow(self):
+        """
+        Test that SelectDateWidget handles OverflowError gracefully when
+        extremely large integer values are supplied.
+        """
+        # Test with extremely large year value
+        data = {"field_year": "1234567821345678", "field_month": "1", "field_day": "1"}
+        result = self.widget.value_from_datadict(data, {}, "field")
+        # Should return pseudo-ISO date string instead of crashing
+        self.assertEqual(result, "1234567821345678-1-1")
+
+        # Test with extremely large month value
+        data = {"field_year": "2000", "field_month": "999999999999999999", "field_day": "1"}
+        result = self.widget.value_from_datadict(data, {}, "field")
+        self.assertEqual(result, "2000-999999999999999999-1")
+
+        # Test with extremely large day value
+        data = {"field_year": "2000", "field_month": "1", "field_day": "999999999999999999"}
+        result = self.widget.value_from_datadict(data, {}, "field")
+        self.assertEqual(result, "2000-1-999999999999999999")
+
     def test_value_omitted_from_data(self):
         self.assertIs(self.widget.value_omitted_from_data({}, {}, "field"), True)
         self.assertIs(
