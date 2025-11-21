@@ -21,7 +21,7 @@ from django.utils.dateparse import (
     parse_date, parse_datetime, parse_duration, parse_time,
 )
 from django.utils.duration import duration_microseconds, duration_string
-from django.utils.functional import Promise, cached_property
+from django.utils.functional import Promise, cached_property, LazyObject
 from django.utils.ipv6 import clean_ipv6_address
 from django.utils.itercompat import is_iterable
 from django.utils.text import capfirst
@@ -804,6 +804,13 @@ class Field(RegisterLookupMixin):
         """Perform preliminary non-db specific value checks and conversions."""
         if isinstance(value, Promise):
             value = value._proxy____cast()
+        elif isinstance(value, LazyObject):
+            # Force evaluation of lazy objects
+            value.__class__
+            value = value._wrapped
+        # If value is a model instance, extract its pk
+        if hasattr(value, '_meta') and hasattr(value, 'pk'):
+            value = value.pk
         return value
 
     def get_db_prep_value(self, value, connection, prepared=False):

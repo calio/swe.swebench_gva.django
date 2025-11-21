@@ -1,0 +1,82 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index caa03665ea..857bad981d 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -21,7 +21,7 @@ from django.utils.dateparse import (
+     parse_date, parse_datetime, parse_duration, parse_time,
+ )
+ from django.utils.duration import duration_microseconds, duration_string
+-from django.utils.functional import Promise, cached_property
++from django.utils.functional import Promise, cached_property, LazyObject
+ from django.utils.ipv6 import clean_ipv6_address
+ from django.utils.itercompat import is_iterable
+ from django.utils.text import capfirst
+@@ -804,6 +804,13 @@ class Field(RegisterLookupMixin):
+         """Perform preliminary non-db specific value checks and conversions."""
+         if isinstance(value, Promise):
+             value = value._proxy____cast()
++        elif isinstance(value, LazyObject):
++            # Force evaluation of lazy objects
++            value.__class__
++            value = value._wrapped
++        # If value is a model instance, extract its pk
++        if hasattr(value, '_meta') and hasattr(value, 'pk'):
++            value = value.pk
+         return value
+ 
+     def get_db_prep_value(self, value, connection, prepared=False):
+diff --git a/tests/queries/tests.py b/tests/queries/tests.py
+index e57cad79ef..c1964280e9 100644
+--- a/tests/queries/tests.py
++++ b/tests/queries/tests.py
+@@ -3950,3 +3950,50 @@ class Ticket23622Tests(TestCase):
+             set(Ticket23605A.objects.filter(qy).values_list('pk', flat=True))
+         )
+         self.assertSequenceEqual(Ticket23605A.objects.filter(qx), [a2])
++
++
++class SimpleLazyObjectFilterTests(TestCase):
++    @classmethod
++    def setUpTestData(cls):
++        import datetime
++        extra1 = ExtraInfo.objects.create(info='extra1')
++        extra2 = ExtraInfo.objects.create(info='extra2')
++        cls.author1 = Author.objects.create(name='Author1', num=1, extra=extra1)
++        cls.author2 = Author.objects.create(name='Author2', num=2, extra=extra2)
++        note1 = Note.objects.create(note='note1')
++        note2 = Note.objects.create(note='note2')
++        cls.item1 = Item.objects.create(
++            name='Item1', created=datetime.datetime.now(), creator=cls.author1, note=note1
++        )
++        cls.item2 = Item.objects.create(
++            name='Item2', created=datetime.datetime.now(), creator=cls.author2, note=note2
++        )
++
++    def test_filter_with_simple_lazy_object(self):
++        """Test filtering with SimpleLazyObject works correctly."""
++        from django.utils.functional import SimpleLazyObject
++        
++        lazy_author = SimpleLazyObject(lambda: self.author1)
++        # This should not raise a TypeError
++        result = Item.objects.filter(creator=lazy_author)
++        self.assertEqual(result.count(), 1)
++        self.assertEqual(result[0], self.item1)
++
++    def test_filter_with_simple_lazy_object_nested_subquery(self):
++        """Test filtering with SimpleLazyObject in nested subquery annotation."""
++        from django.db.models import OuterRef, Subquery
++        from django.utils.functional import SimpleLazyObject
++        
++        # Create a nested subquery annotation
++        creator_subquery = (
++            Item.objects.filter(creator=OuterRef('pk'))
++            .values('creator')
++        )
++        
++        lazy_author = SimpleLazyObject(lambda: self.author1)
++        # This should not raise a TypeError
++        result = Author.objects.annotate(
++            item_creator=Subquery(creator_subquery)
++        ).filter(item_creator=lazy_author)
++        self.assertEqual(result.count(), 1)
++        self.assertEqual(result[0], self.author1)

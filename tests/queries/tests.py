@@ -3950,3 +3950,50 @@ class Ticket23622Tests(TestCase):
             set(Ticket23605A.objects.filter(qy).values_list('pk', flat=True))
         )
         self.assertSequenceEqual(Ticket23605A.objects.filter(qx), [a2])
+
+
+class SimpleLazyObjectFilterTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        import datetime
+        extra1 = ExtraInfo.objects.create(info='extra1')
+        extra2 = ExtraInfo.objects.create(info='extra2')
+        cls.author1 = Author.objects.create(name='Author1', num=1, extra=extra1)
+        cls.author2 = Author.objects.create(name='Author2', num=2, extra=extra2)
+        note1 = Note.objects.create(note='note1')
+        note2 = Note.objects.create(note='note2')
+        cls.item1 = Item.objects.create(
+            name='Item1', created=datetime.datetime.now(), creator=cls.author1, note=note1
+        )
+        cls.item2 = Item.objects.create(
+            name='Item2', created=datetime.datetime.now(), creator=cls.author2, note=note2
+        )
+
+    def test_filter_with_simple_lazy_object(self):
+        """Test filtering with SimpleLazyObject works correctly."""
+        from django.utils.functional import SimpleLazyObject
+        
+        lazy_author = SimpleLazyObject(lambda: self.author1)
+        # This should not raise a TypeError
+        result = Item.objects.filter(creator=lazy_author)
+        self.assertEqual(result.count(), 1)
+        self.assertEqual(result[0], self.item1)
+
+    def test_filter_with_simple_lazy_object_nested_subquery(self):
+        """Test filtering with SimpleLazyObject in nested subquery annotation."""
+        from django.db.models import OuterRef, Subquery
+        from django.utils.functional import SimpleLazyObject
+        
+        # Create a nested subquery annotation
+        creator_subquery = (
+            Item.objects.filter(creator=OuterRef('pk'))
+            .values('creator')
+        )
+        
+        lazy_author = SimpleLazyObject(lambda: self.author1)
+        # This should not raise a TypeError
+        result = Author.objects.annotate(
+            item_creator=Subquery(creator_subquery)
+        ).filter(item_creator=lazy_author)
+        self.assertEqual(result.count(), 1)
+        self.assertEqual(result[0], self.author1)
