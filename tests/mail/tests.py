@@ -403,6 +403,27 @@ class MailTests(HeadersCheckMixin, SimpleTestCase):
             payload1.as_bytes().endswith(b'\n\n<p>Firstname S=FCrname is a <strong>great</strong> guy.</p>')
         )
 
+    def test_non_ascii_domain_with_non_unicode_encoding(self):
+        """
+        Regression test for non-ASCII domain names in Message-ID header
+        when using non-unicode encoding like iso-8859-1.
+        """
+        from unittest.mock import patch
+        from django.core.mail.utils import CachedDnsName
+        
+        # Test with non-ASCII domain and non-unicode encoding
+        with patch('socket.getfqdn', return_value='漢字'):
+            # Create a new CachedDnsName instance to pick up the mocked getfqdn
+            dns_name = CachedDnsName()
+            with patch('django.core.mail.message.DNS_NAME', dns_name):
+                email = EmailMessage('subject', '', 'from@example.com', ['to@example.com'])
+                email.encoding = 'iso-8859-1'
+                message = email.message()
+                # Verify that the Message-ID header is created successfully
+                self.assertIsNotNone(message['Message-ID'])
+                # Verify that the domain is punycode encoded (xn-- prefix)
+                self.assertIn('xn--', message['Message-ID'])
+
     def test_attachments(self):
         """Regression test for #9367"""
         headers = {"Date": "Fri, 09 Nov 2001 01:08:47 -0000", "Message-ID": "foo"}
