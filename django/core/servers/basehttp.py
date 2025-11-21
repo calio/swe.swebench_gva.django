@@ -195,6 +195,17 @@ class WSGIRequestHandler(simple_server.WSGIRequestHandler):
         handler.request_handler = self      # backpointer for logging & connection closing
         handler.run(self.server.get_app())
 
+    def finish(self):
+        # Close database connections to prevent "database is being accessed by
+        # other users" errors when using ThreadedWSGIServer. This is especially
+        # important for LiveServerTestCase which uses ThreadedWSGIServer to
+        # handle requests in separate threads. Each thread gets its own database
+        # connection from the thread-local connection pool, and these connections
+        # must be closed after each request to avoid connection leaks.
+        super().finish()
+        from django.db import connections
+        connections.close_all()
+
 
 def run(addr, port, wsgi_handler, ipv6=False, threading=False, server_cls=WSGIServer):
     server_address = (addr, port)
