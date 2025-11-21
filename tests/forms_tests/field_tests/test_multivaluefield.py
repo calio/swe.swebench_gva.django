@@ -172,3 +172,89 @@ class MultiValueFieldTest(SimpleTestCase):
         })
         form.is_valid()
         self.assertEqual(form.cleaned_data['field1'], 'some text,JP,2007-04-25 06:24:00')
+
+    def test_required_subfield_with_require_all_fields_false(self):
+        """
+        Test that a required sub-field is validated even when
+        require_all_fields=False and the MultiValueField itself is not required.
+        Regression test for issue where MultiValueField ignores required value
+        of a sub field.
+        """
+        class MF(MultiValueField):
+            widget = MultiWidget
+
+            def __init__(self):
+                fields = [
+                    CharField(required=False),
+                    CharField(required=True),
+                ]
+                widget = self.widget(widgets=[f.widget for f in fields], attrs={})
+                super().__init__(
+                    fields=fields,
+                    widget=widget,
+                    require_all_fields=False,
+                    required=False,
+                )
+
+            def compress(self, value):
+                return []
+
+        class TestForm(Form):
+            mf = MF()
+
+        # Test case 1: Both empty - should be invalid because second field is required
+        form = TestForm({'mf_0': '', 'mf_1': ''})
+        self.assertFalse(form.is_valid())
+        self.assertIn('mf', form.errors)
+
+        # Test case 2: First has value, second empty - should be invalid
+        form = TestForm({'mf_0': 'xxx', 'mf_1': ''})
+        self.assertFalse(form.is_valid())
+        self.assertIn('mf', form.errors)
+
+        # Test case 3: Both have values - should be valid
+        form = TestForm({'mf_0': 'xxx', 'mf_1': 'yyy'})
+        self.assertTrue(form.is_valid())
+
+        # Test case 4: First empty, second has value - should be valid
+        form = TestForm({'mf_0': '', 'mf_1': 'yyy'})
+        self.assertTrue(form.is_valid())
+
+    def test_all_optional_subfields_with_require_all_fields_false(self):
+        """
+        Test that when all sub-fields are optional and require_all_fields=False,
+        empty values are accepted.
+        """
+        class MF(MultiValueField):
+            widget = MultiWidget
+
+            def __init__(self):
+                fields = [
+                    CharField(required=False),
+                    CharField(required=False),
+                ]
+                widget = self.widget(widgets=[f.widget for f in fields], attrs={})
+                super().__init__(
+                    fields=fields,
+                    widget=widget,
+                    require_all_fields=False,
+                    required=False,
+                )
+
+            def compress(self, value):
+                return []
+
+        class TestForm(Form):
+            mf = MF()
+
+        # Both empty - should be valid because all fields are optional
+        form = TestForm({'mf_0': '', 'mf_1': ''})
+        self.assertTrue(form.is_valid())
+
+        # One has value - should be valid
+        form = TestForm({'mf_0': 'xxx', 'mf_1': ''})
+        self.assertTrue(form.is_valid())
+
+        # Both have values - should be valid
+        form = TestForm({'mf_0': 'xxx', 'mf_1': 'yyy'})
+        self.assertTrue(form.is_valid())

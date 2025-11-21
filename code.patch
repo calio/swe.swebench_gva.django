@@ -1,0 +1,139 @@
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index 65d6a9ec82..1390b5cc04 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -1025,6 +1025,19 @@ class MultiValueField(Field):
+             if not value or not [v for v in value if v not in self.empty_values]:
+                 if self.required:
+                     raise ValidationError(self.error_messages['required'], code='required')
++                elif not self.require_all_fields:
++                    # Check if any individual field is required when all values are empty
++                    # and require_all_fields is False
++                    for field in self.fields:
++                        if field.required:
++                            # At least one field is required, so we need to validate
++                            # Convert value to a list if it's not already
++                            if not isinstance(value, (list, tuple)):
++                                value = []
++                            break
++                    else:
++                        # No required fields, so we can return early
++                        return self.compress([])
+                 else:
+                     return self.compress([])
+         else:
+diff --git a/tests/forms_tests/field_tests/test_multivaluefield.py b/tests/forms_tests/field_tests/test_multivaluefield.py
+index 29287d0b01..8ecad53958 100644
+--- a/tests/forms_tests/field_tests/test_multivaluefield.py
++++ b/tests/forms_tests/field_tests/test_multivaluefield.py
+@@ -172,3 +172,89 @@ class MultiValueFieldTest(SimpleTestCase):
+         })
+         form.is_valid()
+         self.assertEqual(form.cleaned_data['field1'], 'some text,JP,2007-04-25 06:24:00')
++
++    def test_required_subfield_with_require_all_fields_false(self):
++        """
++        Test that a required sub-field is validated even when
++        require_all_fields=False and the MultiValueField itself is not required.
++        Regression test for issue where MultiValueField ignores required value
++        of a sub field.
++        """
++        class MF(MultiValueField):
++            widget = MultiWidget
++
++            def __init__(self):
++                fields = [
++                    CharField(required=False),
++                    CharField(required=True),
++                ]
++                widget = self.widget(widgets=[f.widget for f in fields], attrs={})
++                super().__init__(
++                    fields=fields,
++                    widget=widget,
++                    require_all_fields=False,
++                    required=False,
++                )
++
++            def compress(self, value):
++                return []
++
++        class TestForm(Form):
++            mf = MF()
++
++        # Test case 1: Both empty - should be invalid because second field is required
++        form = TestForm({'mf_0': '', 'mf_1': ''})
++        self.assertFalse(form.is_valid())
++        self.assertIn('mf', form.errors)
++
++        # Test case 2: First has value, second empty - should be invalid
++        form = TestForm({'mf_0': 'xxx', 'mf_1': ''})
++        self.assertFalse(form.is_valid())
++        self.assertIn('mf', form.errors)
++
++        # Test case 3: Both have values - should be valid
++        form = TestForm({'mf_0': 'xxx', 'mf_1': 'yyy'})
++        self.assertTrue(form.is_valid())
++
++        # Test case 4: First empty, second has value - should be valid
++        form = TestForm({'mf_0': '', 'mf_1': 'yyy'})
++        self.assertTrue(form.is_valid())
++
++    def test_all_optional_subfields_with_require_all_fields_false(self):
++        """
++        Test that when all sub-fields are optional and require_all_fields=False,
++        empty values are accepted.
++        """
++        class MF(MultiValueField):
++            widget = MultiWidget
++
++            def __init__(self):
++                fields = [
++                    CharField(required=False),
++                    CharField(required=False),
++                ]
++                widget = self.widget(widgets=[f.widget for f in fields], attrs={})
++                super().__init__(
++                    fields=fields,
++                    widget=widget,
++                    require_all_fields=False,
++                    required=False,
++                )
++
++            def compress(self, value):
++                return []
++
++        class TestForm(Form):
++            mf = MF()
++
++        # Both empty - should be valid because all fields are optional
++        form = TestForm({'mf_0': '', 'mf_1': ''})
++        self.assertTrue(form.is_valid())
++
++        # One has value - should be valid
++        form = TestForm({'mf_0': 'xxx', 'mf_1': ''})
++        self.assertTrue(form.is_valid())
++
++        # Both have values - should be valid
++        form = TestForm({'mf_0': 'xxx', 'mf_1': 'yyy'})
++        self.assertTrue(form.is_valid())
+diff --git a/tests/forms_tests/tests/test_forms.py b/tests/forms_tests/tests/test_forms.py
+index 0fe0749294..2f242e94c5 100644
+--- a/tests/forms_tests/tests/test_forms.py
++++ b/tests/forms_tests/tests/test_forms.py
+@@ -3091,9 +3091,13 @@ Good luck picking a username that doesn&#x27;t already exist.</p>
+         # For an optional `MultiValueField` with `require_all_fields=False`, we
+         # don't get any `required` error but we still get `incomplete` errors.
+         f = PhoneField(required=False, require_all_fields=False)
+-        self.assertIsNone(f.clean(''))
+-        self.assertIsNone(f.clean(None))
+-        self.assertIsNone(f.clean([]))
++        # When all values are empty and any sub-field is required, we get incomplete errors
++        with self.assertRaisesMessage(ValidationError, "'Enter a complete value.'"):
++            f.clean('')
++        with self.assertRaisesMessage(ValidationError, "'Enter a complete value.'"):
++            f.clean(None)
++        with self.assertRaisesMessage(ValidationError, "'Enter a complete value.'"):
++            f.clean([])
+         with self.assertRaisesMessage(ValidationError, "'Enter a complete value.'"):
+             f.clean(['+61'])
+         self.assertEqual('+61.287654321 ext. 123 (label: )', f.clean(['+61', '287654321', '123']))

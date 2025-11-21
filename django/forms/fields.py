@@ -1025,6 +1025,19 @@ class MultiValueField(Field):
             if not value or not [v for v in value if v not in self.empty_values]:
                 if self.required:
                     raise ValidationError(self.error_messages['required'], code='required')
+                elif not self.require_all_fields:
+                    # Check if any individual field is required when all values are empty
+                    # and require_all_fields is False
+                    for field in self.fields:
+                        if field.required:
+                            # At least one field is required, so we need to validate
+                            # Convert value to a list if it's not already
+                            if not isinstance(value, (list, tuple)):
+                                value = []
+                            break
+                    else:
+                        # No required fields, so we can return early
+                        return self.compress([])
                 else:
                     return self.compress([])
         else:
