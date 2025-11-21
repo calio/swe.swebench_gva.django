@@ -26,7 +26,8 @@ class MigrationTestBase(TransactionTestCase):
         # Reset applied-migrations state.
         for db in self.databases:
             recorder = MigrationRecorder(connections[db])
-            recorder.migration_qs.filter(app='migrations').delete()
+            if recorder.has_table():
+                recorder.migration_qs.filter(app='migrations').delete()
 
     def get_table_description(self, table, using='default'):
         with connections[using].cursor() as cursor:

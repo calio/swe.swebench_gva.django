@@ -1,4 +1,6 @@
-from django.db import connection, migrations, models
+from django.db import connection, connections, migrations, models
+from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 from django.db.migrations.state import ProjectState
 from django.test import override_settings
 
@@ -35,6 +37,14 @@ class MigrateWhenFooRouter:
     """
     def allow_migrate(self, db, app_label, **hints):
         return hints.get('foo', False)
+
+
+class DefaultOnlyRouter:
+    """
+    A router that only allows migrations on the 'default' database.
+    """
+    def allow_migrate(self, db, app_label, **hints):
+        return db == 'default'
 
 
 class MultiDBOperationTests(OperationTestBase):
@@ -169,3 +179,81 @@ class MultiDBOperationTests(OperationTestBase):
     @override_settings(DATABASE_ROUTERS=[MigrateWhenFooRouter()])
     def test_run_python_migrate_foo_router_with_hints(self):
         self._test_run_python('test_mltdb_runpython3', should_run=True, hints={'foo': True})
+
+
+class MigrationRecorderTests(OperationTestBase):
+    """
+    Tests for MigrationRecorder respecting database routers.
+    """
+    databases = {'default', 'other'}
+
+    @override_settings(DATABASE_ROUTERS=[DefaultOnlyRouter()])
+    def test_migration_recorder_respects_router_on_record_applied(self):
+        """
+        MigrationRecorder.record_applied() should not create the django_migrations
+        table on databases where allow_migrate() returns False.
+        """
+        # Ensure the migrations table doesn't exist on 'other' database
+        recorder_other = MigrationRecorder(connections['other'])
+        if recorder_other.has_table():
+            with connections['other'].schema_editor() as editor:
+                editor.delete_model(recorder_other.Migration)
+
+        # Record a migration on the 'other' database
+        # This should NOT create the django_migrations table on 'other'
+        recorder_other.record_applied('test_app', 'test_migration')
+
+        # The table should NOT exist on 'other' database
+        self.assertFalse(
+            recorder_other.has_table(),
+            "django_migrations table should not be created on 'other' database "
+            "when router.allow_migrate() returns False"
+        )
+
+    @override_settings(DATABASE_ROUTERS=[DefaultOnlyRouter()])
+    def test_migration_recorder_respects_router_on_record_unapplied(self):
+        """
+        MigrationRecorder.record_unapplied() should not create the django_migrations
+        table on databases where allow_migrate() returns False.
+        """
+        # Ensure the migrations table doesn't exist on 'other' database
+        recorder_other = MigrationRecorder(connections['other'])
+        if recorder_other.has_table():
+            with connections['other'].schema_editor() as editor:
+                editor.delete_model(recorder_other.Migration)
+
+        # Record unapplied migration on the 'other' database
+        # This should NOT create the django_migrations table on 'other'
+        recorder_other.record_unapplied('test_app', 'test_migration')
+
+        # The table should NOT exist on 'other' database
+        self.assertFalse(
+            recorder_other.has_table(),
+            "django_migrations table should not be created on 'other' database "
+            "when router.allow_migrate() returns False"
+        )
+
+    @override_settings(DATABASE_ROUTERS=[DefaultOnlyRouter()])
+    def test_migration_executor_respects_router_on_migrate(self):
+        """
+        MigrationExecutor.migrate() should not create the django_migrations
+        table on databases where allow_migrate() returns False.
+        """
+        # Ensure the migrations table doesn't exist on 'other' database
+        recorder_other = MigrationRecorder(connections['other'])
+        if recorder_other.has_table():
+            with connections['other'].schema_editor() as editor:
+                editor.delete_model(recorder_other.Migration)
+
+        # Create an executor for the 'other' database
+        executor_other = MigrationExecutor(connections['other'])
+
+        # Call migrate with an empty plan
+        executor_other.migrate([], plan=[])
+
+        # The table should NOT exist on 'other' database
+        self.assertFalse(
+            recorder_other.has_table(),
+            "django_migrations table should not be created on 'other' database "
+            "when router.allow_migrate() returns False"
+        )
