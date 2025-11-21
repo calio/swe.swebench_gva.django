@@ -804,6 +804,29 @@ class TestInlinePermissions(TestCase):
             html=True,
         )
 
+    def test_inline_change_m2m_view_perm(self):
+        """User with view permission on books should not be able to edit/delete M2M inlines."""
+        permission = Permission.objects.get(codename='view_book', content_type=self.book_ct)
+        self.user.user_permissions.add(permission)
+        response = self.client.get(self.author_change_url)
+        # View permission on books, so we can view but not edit/delete inlines
+        self.assertContains(response, '<h2>Author-book relationships</h2>')
+        # Should have the inline form but with readonly fields
+        self.assertContains(
+            response,
+            '<input type="hidden" id="id_Author_books-0-id" value="%i" '
+            'name="Author_books-0-id">' % self.author_book_auto_m2m_intermediate_id,
+            html=True
+        )
+        # Should NOT have DELETE checkbox
+        self.assertNotContains(response, 'id="id_Author_books-0-DELETE"')
+        # Should NOT have extra forms (only 1 form for existing instance, no extra forms)
+        self.assertContains(
+            response,
+            '<input type="hidden" id="id_Author_books-TOTAL_FORMS" value="1" name="Author_books-TOTAL_FORMS">',
+            html=True
+        )
+
 
 @override_settings(ROOT_URLCONF='admin_inlines.urls')
 class SeleniumTests(AdminSeleniumTestCase):
