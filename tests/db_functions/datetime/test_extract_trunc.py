@@ -1226,3 +1226,53 @@ class DateFunctionWithTimeZoneTests(DateFunctionTests):
 
         qs = DTModel.objects.filter(start_datetime__date=Trunc('start_datetime', 'day', output_field=DateField()))
         self.assertEqual(qs.count(), 2)
+
+    def test_trunc_date_func_with_timezone(self):
+        """
+        TruncDate should respect the tzinfo parameter when provided.
+        """
+        start_datetime = datetime(2015, 6, 15, 14, 30, 50, 321)
+        end_datetime = datetime(2016, 6, 15, 14, 10, 50, 123)
+        start_datetime = timezone.make_aware(start_datetime, is_dst=False)
+        end_datetime = timezone.make_aware(end_datetime, is_dst=False)
+        self.create_model(start_datetime, end_datetime)
+        self.create_model(end_datetime, start_datetime)
+
+        melb = pytz.timezone('Australia/Melbourne')
+
+        # Test TruncDate with explicit timezone
+        self.assertQuerysetEqual(
+            DTModel.objects.annotate(
+                truncated=TruncDate('start_datetime', tzinfo=melb)
+            ).order_by('start_datetime'),
+            [
+                (start_datetime, start_datetime.astimezone(melb).date()),
+                (end_datetime, end_datetime.astimezone(melb).date())
+            ],
+            lambda m: (m.start_datetime, m.truncated)
+        )
+
+    def test_trunc_time_func_with_timezone(self):
+        """
+        TruncTime should respect the tzinfo parameter when provided.
+        """
+        start_datetime = datetime(2015, 6, 15, 14, 30, 50, 321)
+        end_datetime = datetime(2016, 6, 15, 14, 10, 50, 123)
+        start_datetime = timezone.make_aware(start_datetime, is_dst=False)
+        end_datetime = timezone.make_aware(end_datetime, is_dst=False)
+        self.create_model(start_datetime, end_datetime)
+        self.create_model(end_datetime, start_datetime)
+
+        melb = pytz.timezone('Australia/Melbourne')
+
+        # Test TruncTime with explicit timezone
+        self.assertQuerysetEqual(
+            DTModel.objects.annotate(
+                truncated=TruncTime('start_datetime', tzinfo=melb)
+            ).order_by('start_datetime'),
+            [
+                (start_datetime, start_datetime.astimezone(melb).time()),
+                (end_datetime, end_datetime.astimezone(melb).time())
+            ],
+            lambda m: (m.start_datetime, m.truncated)
+        )
