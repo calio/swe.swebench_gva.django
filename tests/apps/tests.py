@@ -252,6 +252,23 @@ class AppsTests(SimpleTestCase):
         finally:
             apps.models_ready = True
 
+    def test_clear_cache(self):
+        """
+        Test that clear_cache() clears both get_models and get_swappable_settings_name caches.
+        """
+        # Call get_swappable_settings_name to populate its cache
+        result1 = apps.get_swappable_settings_name("auth.user")
+        # Call it again to ensure it's cached
+        result2 = apps.get_swappable_settings_name("auth.user")
+        self.assertEqual(result1, result2)
+        
+        # Clear the cache
+        apps.clear_cache()
+        
+        # Call it again after clearing - should still work
+        result3 = apps.get_swappable_settings_name("auth.user")
+        self.assertEqual(result1, result3)
+
     def test_dynamic_load(self):
         """
         Makes a new model at runtime and ensures it goes into the right place.

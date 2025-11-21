@@ -1,0 +1,40 @@
+diff --git a/django/apps/registry.py b/django/apps/registry.py
+index 0683f3ad3c..481dd1fc86 100644
+--- a/django/apps/registry.py
++++ b/django/apps/registry.py
+@@ -376,6 +376,7 @@ class Apps:
+         # Call expire cache on each model. This will purge
+         # the relation tree and the fields cache.
+         self.get_models.cache_clear()
++        self.get_swappable_settings_name.cache_clear()
+         if self.ready:
+             # Circumvent self.get_models() to prevent that the cache is refilled.
+             # This particularly prevents that an empty value is cached while cloning.
+diff --git a/tests/apps/tests.py b/tests/apps/tests.py
+index 9f989c5d9a..69b5ae35ae 100644
+--- a/tests/apps/tests.py
++++ b/tests/apps/tests.py
+@@ -252,6 +252,23 @@ class AppsTests(SimpleTestCase):
+         finally:
+             apps.models_ready = True
+ 
++    def test_clear_cache(self):
++        """
++        Test that clear_cache() clears both get_models and get_swappable_settings_name caches.
++        """
++        # Call get_swappable_settings_name to populate its cache
++        result1 = apps.get_swappable_settings_name("auth.user")
++        # Call it again to ensure it's cached
++        result2 = apps.get_swappable_settings_name("auth.user")
++        self.assertEqual(result1, result2)
++        
++        # Clear the cache
++        apps.clear_cache()
++        
++        # Call it again after clearing - should still work
++        result3 = apps.get_swappable_settings_name("auth.user")
++        self.assertEqual(result1, result3)
++
+     def test_dynamic_load(self):
+         """
+         Makes a new model at runtime and ensures it goes into the right place.
