@@ -106,6 +106,13 @@ class Paginator:
         """
         return range(1, self.num_pages + 1)
 
+    def __iter__(self):
+        """
+        Iterate through all pages of the paginator.
+        """
+        for page_num in self.page_range:
+            yield self.page(page_num)
+
     def _check_object_list_is_ordered(self):
         """
         Warn if self.object_list is unordered (typically a QuerySet).

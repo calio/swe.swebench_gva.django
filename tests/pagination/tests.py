@@ -265,6 +265,23 @@ class PaginationTests(SimpleTestCase):
         """
         self.assertIsInstance(Paginator([1, 2, 3], 2).page_range, type(range(0)))
 
+    def test_paginator_iter(self):
+        """
+        Paginator should be iterable, yielding Page objects.
+        """
+        paginator = Paginator([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
+        pages = list(paginator)
+        self.assertEqual(len(pages), 4)
+        # Check that each item is a Page object
+        for i, page in enumerate(pages, 1):
+            self.assertEqual(page.number, i)
+            self.assertEqual(page.paginator, paginator)
+        # Check page contents
+        self.assertEqual(list(pages[0]), [1, 2, 3])
+        self.assertEqual(list(pages[1]), [4, 5, 6])
+        self.assertEqual(list(pages[2]), [7, 8, 9])
+        self.assertEqual(list(pages[3]), [10])
+
     def test_get_page(self):
         """
         Paginator.get_page() returns a valid page even with invalid page
