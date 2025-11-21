@@ -154,6 +154,8 @@ class RegexPattern(CheckURLMixin):
             # non-named groups. Otherwise, pass all non-named arguments as
             # positional arguments.
             kwargs = match.groupdict()
+            # Filter out None values from optional groups that didn't match
+            kwargs = {k: v for k, v in kwargs.items() if v is not None}
             args = () if kwargs else match.groups()
             return path[match.end():], args, kwargs
         return None
