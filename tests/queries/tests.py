@@ -1340,6 +1340,25 @@ class Queries4Tests(TestCase):
         qs2 = otherteachers.filter(schools=s1).filter(schools=s3)
         self.assertQuerysetEqual(qs1 | qs2, [])
 
+    def test_combine_or_with_multiple_joins_reversed(self):
+        # Test that combining querysets with OR in reverse order doesn't
+        # raise AssertionError due to alias collision. This tests the fix
+        # for the issue where sequential aliases from rhs could collide with
+        # newly created aliases during combine operations.
+        s1 = School.objects.create()
+        s2 = School.objects.create()
+        s3 = School.objects.create()
+        t1 = Teacher.objects.create()
+        otherteachers = Teacher.objects.exclude(pk=t1.pk).exclude(friends=t1)
+        qs1 = otherteachers.filter(schools=s1).filter(schools=s2)
+        qs2 = otherteachers.filter(schools=s1).filter(schools=s3)
+        # This should not raise AssertionError
+        result = qs1 | qs2
+        self.assertQuerysetEqual(result, [])
+        # Also test the reverse order
+        result_reversed = qs2 | qs1
+        self.assertQuerysetEqual(result_reversed, [])
+
     def test_ticket7095(self):
         # Updates that are filtered on the model being updated are somewhat
         # tricky in MySQL.

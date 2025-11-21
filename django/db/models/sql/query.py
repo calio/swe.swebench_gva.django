@@ -761,7 +761,14 @@ class Query(BaseExpression):
 
         # Create a new alias for this table.
         if alias_list:
-            alias = '%s%d' % (self.alias_prefix, len(self.alias_map) + 1)
+            # Generate a new alias that doesn't conflict with existing aliases.
+            # Start with len(self.alias_map) + 1 and increment until we find
+            # an unused alias.
+            alias_num = len(self.alias_map) + 1
+            alias = '%s%d' % (self.alias_prefix, alias_num)
+            while alias in self.alias_map:
+                alias_num += 1
+                alias = '%s%d' % (self.alias_prefix, alias_num)
             alias_list.append(alias)
         else:
             # The first occurrence of a table uses the table name directly.
