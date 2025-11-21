@@ -240,3 +240,32 @@ class BulkUpdateTests(TestCase):
             obj.json_field = {'c': obj.json_field['a'] + 1}
         JSONFieldNullable.objects.bulk_update(objs, ['json_field'])
         self.assertCountEqual(JSONFieldNullable.objects.filter(json_field__has_key='c'), objs)
+
+    def test_bulk_update_returns_row_count(self):
+        """Test that bulk_update() returns the number of rows updated."""
+        notes = [
+            Note.objects.create(note=str(i), misc=str(i))
+            for i in range(10)
+        ]
+        for note in notes:
+            note.note = 'updated-%s' % note.id
+        # bulk_update should return the number of rows updated
+        result = Note.objects.bulk_update(notes, ['note'])
+        self.assertEqual(result, 10)
+
+    def test_bulk_update_returns_row_count_with_batch_size(self):
+        """Test that bulk_update() returns the total number of rows updated with batch_size."""
+        notes = [
+            Note.objects.create(note=str(i), misc=str(i))
+            for i in range(10)
+        ]
+        for note in notes:
+            note.note = 'updated-%s' % note.id
+        # bulk_update with batch_size should return the total number of rows updated
+        result = Note.objects.bulk_update(notes, ['note'], batch_size=3)
+        self.assertEqual(result, 10)
+
+    def test_bulk_update_returns_zero_for_empty_list(self):
+        """Test that bulk_update() returns 0 for an empty list."""
+        result = Note.objects.bulk_update([], ['note'])
+        self.assertEqual(result, 0)
