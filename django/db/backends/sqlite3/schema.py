@@ -89,7 +89,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             if self.connection.in_atomic_block:
                 raise NotSupportedError((
                     'Renaming the %r table while in a transaction is not '
-                    'supported on SQLite < 3.26 because it would break referential '
+                    'supported on this version of SQLite because it would break referential '
                     'integrity. Try adding `atomic = False` to the Migration class.'
                 ) % old_db_table)
             self.connection.enable_constraint_checking()
@@ -110,7 +110,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             if self.connection.in_atomic_block:
                 raise NotSupportedError((
                     'Renaming the %r.%r column while in a transaction is not '
-                    'supported on SQLite < 3.26 because it would break referential '
+                    'supported on this version of SQLite because it would break referential '
                     'integrity. Try adding `atomic = False` to the Migration class.'
                 ) % (model._meta.db_table, old_field_name))
             with atomic(self.connection.alias):

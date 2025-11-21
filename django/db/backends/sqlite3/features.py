@@ -31,14 +31,14 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     time_cast_precision = 3
     can_release_savepoints = True
     # Is "ALTER TABLE ... RENAME COLUMN" supported?
-    can_alter_table_rename_column = Database.sqlite_version_info >= (3, 25, 0)
+    can_alter_table_rename_column = True
     supports_parentheses_in_compound = False
     # Deferred constraint checks can be emulated on SQLite < 3.20 but not in a
     # reasonably performant way.
-    supports_pragma_foreign_key_check = Database.sqlite_version_info >= (3, 20, 0)
+    supports_pragma_foreign_key_check = True
     can_defer_constraint_checks = supports_pragma_foreign_key_check
-    supports_functions_in_partial_indexes = Database.sqlite_version_info >= (3, 15, 0)
-    supports_over_clause = Database.sqlite_version_info >= (3, 25, 0)
+    supports_functions_in_partial_indexes = True
+    supports_over_clause = True
     supports_frame_range_fixed_distance = Database.sqlite_version_info >= (3, 28, 0)
     supports_aggregate_filter_clause = Database.sqlite_version_info >= (3, 30, 1)
     supports_order_by_nulls_modifier = Database.sqlite_version_info >= (3, 30, 0)
@@ -66,12 +66,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
                 'model_fields.test_integerfield.PositiveIntegerFieldTests.test_negative_values',
             },
         }
-        if Database.sqlite_version_info < (3, 27):
-            skips.update({
-                'Nondeterministic failure on SQLite < 3.27.': {
-                    'expressions_window.tests.WindowFunctionTests.test_subquery_row_range_rank',
-                },
-            })
         if self.connection.is_in_memory_db():
             skips.update({
                 "the sqlite backend's close() method is a no-op when using an "
@@ -87,7 +81,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
         # references atomically.
         if platform.mac_ver()[0].startswith('10.15.') and Database.sqlite_version_info == (3, 28, 0):
             return False
-        return Database.sqlite_version_info >= (3, 26, 0)
+        return True
 
     @cached_property
     def introspected_field_types(self):
