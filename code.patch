@@ -1,0 +1,68 @@
+diff --git a/django/contrib/admin/options.py b/django/contrib/admin/options.py
+index 64be087bf1..6219590924 100644
+--- a/django/contrib/admin/options.py
++++ b/django/contrib/admin/options.py
+@@ -269,7 +269,8 @@ class BaseModelAdmin(metaclass=forms.MediaDefiningClass):
+                         "class": get_ul_class(self.radio_fields[db_field.name]),
+                     }
+                 )
+-                kwargs["empty_label"] = _("None") if db_field.blank else None
++                if "empty_label" not in kwargs:
++                    kwargs["empty_label"] = _("None") if db_field.blank else None
+ 
+         if "queryset" not in kwargs:
+             queryset = self.get_field_queryset(db, db_field, request)
+diff --git a/django/forms/models.py b/django/forms/models.py
+index b6ce73cc5e..19572a2523 100644
+--- a/django/forms/models.py
++++ b/django/forms/models.py
+@@ -1461,7 +1461,12 @@ class ModelChoiceField(ChoiceField):
+             help_text=help_text,
+             **kwargs,
+         )
+-        if (required and initial is not None) or (
++        # Only override empty_label if it wasn't explicitly provided.
++        # If empty_label is not the default "---------", it was explicitly set.
++        if empty_label != "---------":
++            # User explicitly provided a custom empty_label, respect it
++            self.empty_label = empty_label
++        elif (required and initial is not None) or (
+             isinstance(self.widget, RadioSelect) and not blank
+         ):
+             self.empty_label = None
+diff --git a/tests/admin_widgets/tests.py b/tests/admin_widgets/tests.py
+index db724b4196..e25d3f09b5 100644
+--- a/tests/admin_widgets/tests.py
++++ b/tests/admin_widgets/tests.py
+@@ -141,6 +141,31 @@ class AdminFormfieldForDBFieldTests(SimpleTestCase):
+         )
+         self.assertIsNone(ff.empty_label)
+ 
++    def test_radio_fields_ForeignKey_custom_empty_label(self):
++        """
++        Test that custom empty_label set in formfield_for_foreignkey
++        is not overridden when radio_fields is used.
++        """
++        class MyModelAdmin(admin.ModelAdmin):
++            radio_fields = {"main_band": admin.VERTICAL}
++
++            def formfield_for_foreignkey(self, db_field, request, **kwargs):
++                if db_field.name == "main_band":
++                    kwargs["empty_label"] = "I WANT TO SET MY OWN EMPTY LABEL"
++                return super().formfield_for_foreignkey(db_field, request, **kwargs)
++
++        ma = MyModelAdmin(Event, admin.site)
++        ff = ma.formfield_for_dbfield(Event._meta.get_field("main_band"), request=None)
++
++        # "unwrap" the widget wrapper, if needed
++        if isinstance(ff.widget, widgets.RelatedFieldWidgetWrapper):
++            widget = ff.widget.widget
++        else:
++            widget = ff.widget
++
++        self.assertIsInstance(widget, widgets.AdminRadioSelect)
++        self.assertEqual(ff.empty_label, "I WANT TO SET MY OWN EMPTY LABEL")
++
+     def test_many_to_many(self):
+         self.assertFormfield(Band, "members", forms.SelectMultiple)
+ 

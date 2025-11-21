@@ -141,6 +141,31 @@ class AdminFormfieldForDBFieldTests(SimpleTestCase):
         )
         self.assertIsNone(ff.empty_label)
 
+    def test_radio_fields_ForeignKey_custom_empty_label(self):
+        """
+        Test that custom empty_label set in formfield_for_foreignkey
+        is not overridden when radio_fields is used.
+        """
+        class MyModelAdmin(admin.ModelAdmin):
+            radio_fields = {"main_band": admin.VERTICAL}
+
+            def formfield_for_foreignkey(self, db_field, request, **kwargs):
+                if db_field.name == "main_band":
+                    kwargs["empty_label"] = "I WANT TO SET MY OWN EMPTY LABEL"
+                return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+        ma = MyModelAdmin(Event, admin.site)
+        ff = ma.formfield_for_dbfield(Event._meta.get_field("main_band"), request=None)
+
+        # "unwrap" the widget wrapper, if needed
+        if isinstance(ff.widget, widgets.RelatedFieldWidgetWrapper):
+            widget = ff.widget.widget
+        else:
+            widget = ff.widget
+
+        self.assertIsInstance(widget, widgets.AdminRadioSelect)
+        self.assertEqual(ff.empty_label, "I WANT TO SET MY OWN EMPTY LABEL")
+
     def test_many_to_many(self):
         self.assertFormfield(Band, "members", forms.SelectMultiple)
 

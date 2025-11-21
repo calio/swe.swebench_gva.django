@@ -1461,7 +1461,12 @@ class ModelChoiceField(ChoiceField):
             help_text=help_text,
             **kwargs,
         )
-        if (required and initial is not None) or (
+        # Only override empty_label if it wasn't explicitly provided.
+        # If empty_label is not the default "---------", it was explicitly set.
+        if empty_label != "---------":
+            # User explicitly provided a custom empty_label, respect it
+            self.empty_label = empty_label
+        elif (required and initial is not None) or (
             isinstance(self.widget, RadioSelect) and not blank
         ):
             self.empty_label = None
