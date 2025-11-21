@@ -14,6 +14,7 @@ from django.test.utils import Approximate
 from .models import (
     Actor,
     Article,
+    ArticleWithTopics,
     Author,
     AuthorProfile,
     BaseModel,
@@ -26,6 +27,7 @@ from .models import (
     ProxyProxyBaseModel,
     Score,
     Team,
+    Topic,
 )
 
 
@@ -434,6 +436,27 @@ class SerializersTestBase:
         # CategoryMetaData has natural_key().
         meta_data_sql = ctx[2]["sql"]
         self.assertIn(connection.ops.quote_name("kind"), meta_data_sql)
+
+    def test_serialize_m2m_with_custom_manager_select_related(self):
+        """
+        Test serialization of m2m fields when the related model has a custom
+        manager that uses select_related(). Regression test for issue where
+        FieldError was raised: "Field cannot be both deferred and traversed
+        using select_related at the same time."
+        """
+        # Create test data
+        category = Category.objects.create(name="Test Category")
+        topic = Topic.objects.create(name="Test Topic", category=category)
+        article = ArticleWithTopics.objects.create(headline="Test Article")
+        article.topics.add(topic)
+
+        # This should not raise FieldError
+        serial_str = serializers.serialize(
+            self.serializer_name,
+            ArticleWithTopics.objects.all(),
+            use_natural_foreign_keys=False,
+        )
+        self.assertTrue(self._validate_output(serial_str))
 
 
 class SerializerAPITests(SimpleTestCase):

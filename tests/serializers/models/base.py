@@ -163,3 +163,31 @@ class ComplexModel(models.Model):
     field1 = models.CharField(max_length=10)
     field2 = models.CharField(max_length=10)
     field3 = models.CharField(max_length=10)
+
+
+class TopicManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().select_related("category")
+
+
+class Topic(models.Model):
+    name = models.CharField(max_length=255)
+    category = models.ForeignKey(Category, models.CASCADE)
+    objects = TopicManager()
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+
+class ArticleWithTopics(models.Model):
+    headline = models.CharField(max_length=50)
+    topics = models.ManyToManyField(Topic)
+
+    class Meta:
+        ordering = ("headline",)
+
+    def __str__(self):
+        return self.headline

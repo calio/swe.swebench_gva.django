@@ -1,0 +1,110 @@
+diff --git a/django/core/serializers/python.py b/django/core/serializers/python.py
+index 36048601af..4ad563ba43 100644
+--- a/django/core/serializers/python.py
++++ b/django/core/serializers/python.py
+@@ -79,7 +79,7 @@ class Serializer(base.Serializer):
+                     return self._value_from_field(value, value._meta.pk)
+ 
+                 def queryset_iterator(obj, field):
+-                    return getattr(obj, field.name).only("pk").iterator()
++                    return getattr(obj, field.name).select_related(None).only("pk").iterator()
+ 
+             m2m_iter = getattr(obj, "_prefetched_objects_cache", {}).get(
+                 field.name,
+diff --git a/django/core/serializers/xml_serializer.py b/django/core/serializers/xml_serializer.py
+index 1d3269c41a..44458be22c 100644
+--- a/django/core/serializers/xml_serializer.py
++++ b/django/core/serializers/xml_serializer.py
+@@ -155,7 +155,7 @@ class Serializer(base.Serializer):
+                     self.xml.addQuickElement("object", attrs={"pk": str(value.pk)})
+ 
+                 def queryset_iterator(obj, field):
+-                    return getattr(obj, field.name).only("pk").iterator()
++                    return getattr(obj, field.name).select_related(None).only("pk").iterator()
+ 
+             m2m_iter = getattr(obj, "_prefetched_objects_cache", {}).get(
+                 field.name,
+diff --git a/tests/serializers/models/base.py b/tests/serializers/models/base.py
+index af9ca2b20a..83db026657 100644
+--- a/tests/serializers/models/base.py
++++ b/tests/serializers/models/base.py
+@@ -163,3 +163,31 @@ class ComplexModel(models.Model):
+     field1 = models.CharField(max_length=10)
+     field2 = models.CharField(max_length=10)
+     field3 = models.CharField(max_length=10)
++
++
++class TopicManager(models.Manager):
++    def get_queryset(self):
++        return super().get_queryset().select_related("category")
++
++
++class Topic(models.Model):
++    name = models.CharField(max_length=255)
++    category = models.ForeignKey(Category, models.CASCADE)
++    objects = TopicManager()
++
++    class Meta:
++        ordering = ("name",)
++
++    def __str__(self):
++        return self.name
++
++
++class ArticleWithTopics(models.Model):
++    headline = models.CharField(max_length=50)
++    topics = models.ManyToManyField(Topic)
++
++    class Meta:
++        ordering = ("headline",)
++
++    def __str__(self):
++        return self.headline
+diff --git a/tests/serializers/tests.py b/tests/serializers/tests.py
+index 67ae8f43de..7f16c5ab38 100644
+--- a/tests/serializers/tests.py
++++ b/tests/serializers/tests.py
+@@ -14,6 +14,7 @@ from django.test.utils import Approximate
+ from .models import (
+     Actor,
+     Article,
++    ArticleWithTopics,
+     Author,
+     AuthorProfile,
+     BaseModel,
+@@ -26,6 +27,7 @@ from .models import (
+     ProxyProxyBaseModel,
+     Score,
+     Team,
++    Topic,
+ )
+ 
+ 
+@@ -435,6 +437,27 @@ class SerializersTestBase:
+         meta_data_sql = ctx[2]["sql"]
+         self.assertIn(connection.ops.quote_name("kind"), meta_data_sql)
+ 
++    def test_serialize_m2m_with_custom_manager_select_related(self):
++        """
++        Test serialization of m2m fields when the related model has a custom
++        manager that uses select_related(). Regression test for issue where
++        FieldError was raised: "Field cannot be both deferred and traversed
++        using select_related at the same time."
++        """
++        # Create test data
++        category = Category.objects.create(name="Test Category")
++        topic = Topic.objects.create(name="Test Topic", category=category)
++        article = ArticleWithTopics.objects.create(headline="Test Article")
++        article.topics.add(topic)
++
++        # This should not raise FieldError
++        serial_str = serializers.serialize(
++            self.serializer_name,
++            ArticleWithTopics.objects.all(),
++            use_natural_foreign_keys=False,
++        )
++        self.assertTrue(self._validate_output(serial_str))
++
+ 
+ class SerializerAPITests(SimpleTestCase):
+     def test_stream_class(self):
