@@ -1,0 +1,131 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index b8efb9f881..6058aa081f 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -216,14 +216,28 @@ def get_child_arguments():
+     executable is reported to not have the .exe extension which can cause bugs
+     on reloading.
+     """
+-    import django.__main__
+-    django_main_path = Path(django.__main__.__file__)
+     py_script = Path(sys.argv[0])
+ 
+     args = [sys.executable] + ['-W%s' % o for o in sys.warnoptions]
+-    if py_script == django_main_path:
+-        # The server was started with `python -m django runserver`.
+-        args += ['-m', 'django']
++    
++    # Determine if Python was started with -m by checking __main__.__spec__.parent.
++    # When Python is run with -m package_name, __main__.__spec__.parent contains
++    # the parent package name (or empty string for top-level packages).
++    # When Python is run directly with a script, __main__.__spec__ is None.
++    main_module = sys.modules.get('__main__')
++    main_spec = getattr(main_module, '__spec__', None)
++    
++    if main_spec is not None and main_spec.parent is not None:
++        # Python was started with -m, so we need to reconstruct the -m invocation.
++        # main_spec.parent is the parent package (e.g., 'mypackage' for 'python -m mypackage')
++        # For top-level packages, main_spec.parent is an empty string.
++        if main_spec.parent:
++            # Nested package: -m parent.subpackage
++            module_name = main_spec.parent
++        else:
++            # Top-level package: -m package
++            module_name = main_spec.name
++        args += ['-m', module_name]
+         args += sys.argv[1:]
+     elif not py_script.exists():
+         # sys.argv[0] may not exist for several reasons on Windows.
+diff --git a/tests/utils_tests/test_autoreload.py b/tests/utils_tests/test_autoreload.py
+index b9f2db7276..a245c4a7e4 100644
+--- a/tests/utils_tests/test_autoreload.py
++++ b/tests/utils_tests/test_autoreload.py
+@@ -160,10 +160,17 @@ class TestChildArguments(SimpleTestCase):
+     @mock.patch('sys.argv', [django.__main__.__file__, 'runserver'])
+     @mock.patch('sys.warnoptions', [])
+     def test_run_as_module(self):
+-        self.assertEqual(
+-            autoreload.get_child_arguments(),
+-            [sys.executable, '-m', 'django', 'runserver']
+-        )
++        import types
++        # Create a mock __main__ module with __spec__ set as if run with -m django
++        fake_main = types.ModuleType('__main__')
++        fake_spec = types.SimpleNamespace(name='__main__', parent='django')
++        fake_main.__spec__ = fake_spec
++        
++        with mock.patch.dict(sys.modules, {'__main__': fake_main}):
++            self.assertEqual(
++                autoreload.get_child_arguments(),
++                [sys.executable, '-m', 'django', 'runserver']
++            )
+ 
+     @mock.patch('sys.argv', [__file__, 'runserver'])
+     @mock.patch('sys.warnoptions', ['error'])
+@@ -202,6 +209,46 @@ class TestChildArguments(SimpleTestCase):
+         with self.assertRaisesMessage(RuntimeError, msg):
+             autoreload.get_child_arguments()
+ 
++    @mock.patch('sys.argv', ['__main__.py', 'runserver'])
++    @mock.patch('sys.warnoptions', [])
++    def test_run_as_module_with_non_django_package(self):
++        """
++        Test that autoreload works with packages other than Django.
++        When Python is run with -m mypackage, __main__.__spec__.parent
++        should be set to the package name.
++        """
++        import types
++        # Create a mock __main__ module with __spec__ set as if run with -m mypackage
++        fake_main = types.ModuleType('__main__')
++        fake_spec = types.SimpleNamespace(name='__main__', parent='mypackage')
++        fake_main.__spec__ = fake_spec
++        
++        with mock.patch.dict(sys.modules, {'__main__': fake_main}):
++            self.assertEqual(
++                autoreload.get_child_arguments(),
++                [sys.executable, '-m', 'mypackage', 'runserver']
++            )
++
++    @mock.patch('sys.argv', ['__main__.py', 'runserver'])
++    @mock.patch('sys.warnoptions', [])
++    def test_run_as_module_with_top_level_package(self):
++        """
++        Test that autoreload works with top-level packages run with -m.
++        When Python is run with -m package, __main__.__spec__.parent
++        should be an empty string, and __main__.__spec__.name should be 'package'.
++        """
++        import types
++        # Create a mock __main__ module with __spec__ set as if run with -m package
++        fake_main = types.ModuleType('__main__')
++        fake_spec = types.SimpleNamespace(name='package', parent='')
++        fake_main.__spec__ = fake_spec
++        
++        with mock.patch.dict(sys.modules, {'__main__': fake_main}):
++            self.assertEqual(
++                autoreload.get_child_arguments(),
++                [sys.executable, '-m', 'package', 'runserver']
++            )
++
+ 
+ class TestUtilities(SimpleTestCase):
+     def test_is_django_module(self):
+@@ -447,9 +494,16 @@ class RestartWithReloaderTests(SimpleTestCase):
+         argv = [main, 'runserver']
+         mock_call = self.patch_autoreload(argv)
+         with mock.patch('django.__main__.__file__', main):
+-            autoreload.restart_with_reloader()
+-            self.assertEqual(mock_call.call_count, 1)
+-            self.assertEqual(mock_call.call_args[0][0], [self.executable, '-Wall', '-m', 'django'] + argv[1:])
++            import types
++            # Create a mock __main__ module with __spec__ set as if run with -m django
++            fake_main = types.ModuleType('__main__')
++            fake_spec = types.SimpleNamespace(name='__main__', parent='django')
++            fake_main.__spec__ = fake_spec
++            
++            with mock.patch.dict(sys.modules, {'__main__': fake_main}):
++                autoreload.restart_with_reloader()
++                self.assertEqual(mock_call.call_count, 1)
++                self.assertEqual(mock_call.call_args[0][0], [self.executable, '-Wall', '-m', 'django'] + argv[1:])
+ 
+ 
+ class ReloaderTests(SimpleTestCase):

@@ -160,10 +160,17 @@ class TestChildArguments(SimpleTestCase):
     @mock.patch('sys.argv', [django.__main__.__file__, 'runserver'])
     @mock.patch('sys.warnoptions', [])
     def test_run_as_module(self):
-        self.assertEqual(
-            autoreload.get_child_arguments(),
-            [sys.executable, '-m', 'django', 'runserver']
-        )
+        import types
+        # Create a mock __main__ module with __spec__ set as if run with -m django
+        fake_main = types.ModuleType('__main__')
+        fake_spec = types.SimpleNamespace(name='__main__', parent='django')
+        fake_main.__spec__ = fake_spec
+        
+        with mock.patch.dict(sys.modules, {'__main__': fake_main}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-m', 'django', 'runserver']
+            )
 
     @mock.patch('sys.argv', [__file__, 'runserver'])
     @mock.patch('sys.warnoptions', ['error'])
@@ -201,6 +208,46 @@ class TestChildArguments(SimpleTestCase):
         msg = 'Script does-not-exist does not exist.'
         with self.assertRaisesMessage(RuntimeError, msg):
             autoreload.get_child_arguments()
+
+    @mock.patch('sys.argv', ['__main__.py', 'runserver'])
+    @mock.patch('sys.warnoptions', [])
+    def test_run_as_module_with_non_django_package(self):
+        """
+        Test that autoreload works with packages other than Django.
+        When Python is run with -m mypackage, __main__.__spec__.parent
+        should be set to the package name.
+        """
+        import types
+        # Create a mock __main__ module with __spec__ set as if run with -m mypackage
+        fake_main = types.ModuleType('__main__')
+        fake_spec = types.SimpleNamespace(name='__main__', parent='mypackage')
+        fake_main.__spec__ = fake_spec
+        
+        with mock.patch.dict(sys.modules, {'__main__': fake_main}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-m', 'mypackage', 'runserver']
+            )
+
+    @mock.patch('sys.argv', ['__main__.py', 'runserver'])
+    @mock.patch('sys.warnoptions', [])
+    def test_run_as_module_with_top_level_package(self):
+        """
+        Test that autoreload works with top-level packages run with -m.
+        When Python is run with -m package, __main__.__spec__.parent
+        should be an empty string, and __main__.__spec__.name should be 'package'.
+        """
+        import types
+        # Create a mock __main__ module with __spec__ set as if run with -m package
+        fake_main = types.ModuleType('__main__')
+        fake_spec = types.SimpleNamespace(name='package', parent='')
+        fake_main.__spec__ = fake_spec
+        
+        with mock.patch.dict(sys.modules, {'__main__': fake_main}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-m', 'package', 'runserver']
+            )
 
 
 class TestUtilities(SimpleTestCase):
@@ -447,9 +494,16 @@ class RestartWithReloaderTests(SimpleTestCase):
         argv = [main, 'runserver']
         mock_call = self.patch_autoreload(argv)
         with mock.patch('django.__main__.__file__', main):
-            autoreload.restart_with_reloader()
-            self.assertEqual(mock_call.call_count, 1)
-            self.assertEqual(mock_call.call_args[0][0], [self.executable, '-Wall', '-m', 'django'] + argv[1:])
+            import types
+            # Create a mock __main__ module with __spec__ set as if run with -m django
+            fake_main = types.ModuleType('__main__')
+            fake_spec = types.SimpleNamespace(name='__main__', parent='django')
+            fake_main.__spec__ = fake_spec
+            
+            with mock.patch.dict(sys.modules, {'__main__': fake_main}):
+                autoreload.restart_with_reloader()
+                self.assertEqual(mock_call.call_count, 1)
+                self.assertEqual(mock_call.call_args[0][0], [self.executable, '-Wall', '-m', 'django'] + argv[1:])
 
 
 class ReloaderTests(SimpleTestCase):

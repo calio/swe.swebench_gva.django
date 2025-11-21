@@ -216,14 +216,28 @@ def get_child_arguments():
     executable is reported to not have the .exe extension which can cause bugs
     on reloading.
     """
-    import django.__main__
-    django_main_path = Path(django.__main__.__file__)
     py_script = Path(sys.argv[0])
 
     args = [sys.executable] + ['-W%s' % o for o in sys.warnoptions]
-    if py_script == django_main_path:
-        # The server was started with `python -m django runserver`.
-        args += ['-m', 'django']
+    
+    # Determine if Python was started with -m by checking __main__.__spec__.parent.
+    # When Python is run with -m package_name, __main__.__spec__.parent contains
+    # the parent package name (or empty string for top-level packages).
+    # When Python is run directly with a script, __main__.__spec__ is None.
+    main_module = sys.modules.get('__main__')
+    main_spec = getattr(main_module, '__spec__', None)
+    
+    if main_spec is not None and main_spec.parent is not None:
+        # Python was started with -m, so we need to reconstruct the -m invocation.
+        # main_spec.parent is the parent package (e.g., 'mypackage' for 'python -m mypackage')
+        # For top-level packages, main_spec.parent is an empty string.
+        if main_spec.parent:
+            # Nested package: -m parent.subpackage
+            module_name = main_spec.parent
+        else:
+            # Top-level package: -m package
+            module_name = main_spec.name
+        args += ['-m', module_name]
         args += sys.argv[1:]
     elif not py_script.exists():
         # sys.argv[0] may not exist for several reasons on Windows.
