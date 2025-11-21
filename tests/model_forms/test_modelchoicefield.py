@@ -353,3 +353,33 @@ class ModelChoiceFieldTests(TestCase):
         )
         with self.assertNumQueries(2):
             template.render(Context({'form': CategoriesForm()}))
+
+    def test_radioselect_blank_false_no_empty_option(self):
+        """
+        RadioSelect widget should not render a blank option when the
+        ForeignKey field has blank=False.
+        """
+        from django.forms.widgets import RadioSelect
+        from .models import Award, Character
+
+        char = Character.objects.create(username='test', last_action='2020-01-01')
+
+        class AwardForm(forms.ModelForm):
+            class Meta:
+                from .models import Award
+                model = Award
+                fields = ['character']
+                widgets = {'character': RadioSelect()}
+
+        # Create a new form (no instance)
+        form = AwardForm()
+        
+        # The choices should NOT include a blank option
+        choices = list(form.fields['character'].choices)
+        self.assertEqual(len(choices), 1)  # Only the character, no blank option
+        self.assertEqual(choices[0][0], char.pk)
+        self.assertEqual(choices[0][1], 'test')
+        
+        # The rendered form should not have a checked empty option
+        rendered = str(form['character'])
+        self.assertNotIn('value=""', rendered)
