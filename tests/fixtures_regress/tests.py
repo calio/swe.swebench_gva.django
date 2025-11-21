@@ -569,6 +569,21 @@ class TestFixtures(TestCase):
         with self.assertRaisesMessage(ImproperlyConfigured, msg):
             management.call_command("loaddata", "absolute.json", verbosity=0)
 
+    @override_settings(FIXTURE_DIRS=[Path(_cur_dir) / "fixtures"])
+    def test_fixture_dirs_with_default_fixture_path_pathlib(self):
+        """
+        settings.FIXTURE_DIRS cannot contain a default fixtures directory
+        for application (app/fixtures) as a Path instance in order to avoid
+        repeated fixture loading.
+        """
+        msg = (
+            "'%s' is a default fixture directory for the '%s' app "
+            "and cannot be listed in settings.FIXTURE_DIRS."
+            % (os.path.join(_cur_dir, "fixtures"), "fixtures_regress")
+        )
+        with self.assertRaisesMessage(ImproperlyConfigured, msg):
+            management.call_command("loaddata", "absolute.json", verbosity=0)
+
     @override_settings(
         FIXTURE_DIRS=[
             os.path.join(_cur_dir, "fixtures_1"),
@@ -586,6 +601,38 @@ class TestFixtures(TestCase):
     def test_fixtures_dir_pathlib(self):
         management.call_command("loaddata", "inner/absolute.json", verbosity=0)
         self.assertQuerysetEqual(Absolute.objects.all(), [1], transform=lambda o: o.pk)
+
+    @override_settings(
+        FIXTURE_DIRS=[
+            Path(_cur_dir) / "fixtures_1",
+            Path(_cur_dir) / "fixtures_1",
+        ]
+    )
+    def test_fixture_dirs_with_duplicates_pathlib(self):
+        """
+        settings.FIXTURE_DIRS cannot contain duplicates (as Path instances)
+        in order to avoid repeated fixture loading.
+        """
+        with self.assertRaisesMessage(
+            ImproperlyConfigured, "settings.FIXTURE_DIRS contains duplicates."
+        ):
+            management.call_command("loaddata", "absolute.json", verbosity=0)
+
+    @override_settings(
+        FIXTURE_DIRS=[
+            os.path.join(_cur_dir, "fixtures_1"),
+            Path(_cur_dir) / "fixtures_1",
+        ]
+    )
+    def test_fixture_dirs_with_duplicates_mixed_types(self):
+        """
+        settings.FIXTURE_DIRS cannot contain duplicates when mixing
+        string and Path instances representing the same directory.
+        """
+        with self.assertRaisesMessage(
+            ImproperlyConfigured, "settings.FIXTURE_DIRS contains duplicates."
+        ):
+            management.call_command("loaddata", "absolute.json", verbosity=0)
 
 
 class NaturalKeyFixtureTests(TestCase):
