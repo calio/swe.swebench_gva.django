@@ -528,6 +528,39 @@ class AlterTogetherOptionOperation(ModelOptionOperation):
     def migration_name_fragment(self):
         return 'alter_%s_%s' % (self.name_lower, self.option_name)
 
+    def reduce(self, operation, app_label):
+        """
+        Optimize consecutive AlterTogetherOptionOperation operations.
+        
+        If this operation removes constraints (empty set) and the next operation
+        adds constraints (non-empty set) for the same model, we can optimize
+        them into a single operation representing the final state.
+        
+        Also, allow other AlterTogetherOptionOperation subclasses to optimize
+        through this operation if this operation removes constraints (empty set).
+        """
+        if (
+            isinstance(operation, self.__class__) and
+            self.name_lower == operation.name_lower and
+            not self.option_value and
+            operation.option_value
+        ):
+            # This operation removes constraints (empty set),
+            # and the next operation adds constraints (non-empty set).
+            # Return only the next operation (which represents the final state).
+            return [operation]
+        # Allow other AlterTogetherOptionOperation subclasses to optimize through
+        # this operation if this operation removes constraints (empty set).
+        if (
+            isinstance(operation, AlterTogetherOptionOperation) and
+            self.name_lower == operation.name_lower and
+            not self.option_value
+        ):
+            # This operation removes constraints (empty set), so other operations
+            # can optimize through it.
+            return True
+        return super().reduce(operation, app_label)
+
 
 class AlterUniqueTogether(AlterTogetherOptionOperation):
     """

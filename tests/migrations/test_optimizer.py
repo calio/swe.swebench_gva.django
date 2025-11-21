@@ -218,6 +218,53 @@ class OptimizerTests(SimpleTestCase):
             migrations.AlterOrderWithRespectTo("Foo", "b"),
         )
 
+    def test_optimize_remove_and_add_unique_together(self):
+        """
+        AlterUniqueTogether with empty set followed by AlterUniqueTogether
+        with non-empty set should be optimized to a single operation.
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.AlterUniqueTogether("Foo", []),
+                migrations.AlterUniqueTogether("Foo", [["a", "b"]]),
+            ],
+            [
+                migrations.AlterUniqueTogether("Foo", [["a", "b"]]),
+            ],
+        )
+
+    def test_optimize_remove_and_add_index_together(self):
+        """
+        AlterIndexTogether with empty set followed by AlterIndexTogether
+        with non-empty set should be optimized to a single operation.
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.AlterIndexTogether("Foo", []),
+                migrations.AlterIndexTogether("Foo", [["a", "b"]]),
+            ],
+            [
+                migrations.AlterIndexTogether("Foo", [["a", "b"]]),
+            ],
+        )
+
+    def test_optimize_remove_and_add_together_multiple(self):
+        """
+        Multiple remove and add operations should be optimized.
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.AlterUniqueTogether("Foo", []),
+                migrations.AlterIndexTogether("Foo", []),
+                migrations.AlterUniqueTogether("Foo", [["a"]]),
+                migrations.AlterIndexTogether("Foo", [["a"]]),
+            ],
+            [
+                migrations.AlterUniqueTogether("Foo", [["a"]]),
+                migrations.AlterIndexTogether("Foo", [["a"]]),
+            ],
+        )
+
     def test_optimize_through_create(self):
         """
         We should be able to optimize away create/delete through a create or delete
