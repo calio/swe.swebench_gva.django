@@ -1643,3 +1643,26 @@ class AggregateTestCase(TestCase):
             exists=Exists(Author.objects.extra(where=['1=0'])),
         )
         self.assertEqual(len(qs), 6)
+
+    def test_aggregate_with_default_after_annotate(self):
+        # Test for issue where aggregate() with 'default' after annotate() crashes
+        # This should not raise an OperationalError
+        result = Book.objects.annotate(idx=F('id')).aggregate(Sum('id', default=0))
+        self.assertIsNotNone(result['id__sum'])
+        self.assertGreater(result['id__sum'], 0)
+
+    def test_multiple_aggregates_with_default_after_annotate(self):
+        # Test multiple aggregates with defaults after annotate
+        result = Book.objects.annotate(idx=F('id')).aggregate(
+            total_pages=Sum('pages', default=0),
+            avg_rating=Avg('rating', default=0),
+            min_pages=Min('pages', default=0),
+        )
+        self.assertIsNotNone(result['total_pages'])
+        self.assertIsNotNone(result['avg_rating'])
+        self.assertIsNotNone(result['min_pages'])
+
+    def test_empty_queryset_aggregate_with_default_after_annotate(self):
+        # Test empty queryset with aggregate default after annotate
+        result = Book.objects.filter(pages__gt=10000).annotate(idx=F('id')).aggregate(Sum('pages', default=0))
+        self.assertEqual(result['pages__sum'], 0)
