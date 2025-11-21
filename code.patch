@@ -1,0 +1,35 @@
+diff --git a/tests/filtered_relation/tests.py b/tests/filtered_relation/tests.py
+index 790a90d9e2..d442580cbe 100644
+--- a/tests/filtered_relation/tests.py
++++ b/tests/filtered_relation/tests.py
+@@ -657,6 +657,30 @@ class FilteredRelationTests(TestCase):
+             FilteredRelation("book", condition=Q(book__title="b")), mock.ANY
+         )
+ 
++    def test_multiple_filtered_relations_same_relation_different_conditions(self):
++        """
++        Test that multiple FilteredRelations on the same relation with
++        different filter conditions create separate JOINs.
++        Regression test for issue where only one JOIN was created.
++        """
++        qs = Author.objects.annotate(
++            book_alice=FilteredRelation(
++                "book", condition=Q(book__title__icontains="Alice")
++            ),
++            book_jane=FilteredRelation(
++                "book", condition=Q(book__title__icontains="Jane")
++            ),
++        ).values("book_alice", "book_jane")
++
++        # Check that the SQL contains two JOINs
++        sql = str(qs.query)
++        join_count = sql.count("JOIN")
++        self.assertGreaterEqual(
++            join_count,
++            2,
++            f"Expected at least 2 JOINs but got {join_count}. SQL: {sql}",
++        )
++
+ 
+ class FilteredRelationAggregationTests(TestCase):
+     @classmethod
