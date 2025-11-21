@@ -292,6 +292,32 @@ class AutocompleteJsonViewTests(AdminViewBasicTestCase):
             'results': [{'id': str(q.pk), 'text': q.question} for q in Question.objects.all()[PAGINATOR_SIZE:]],
             'pagination': {'more': False},
         })
+    def test_serialize_result(self):
+        """
+        Test that serialize_result can be overridden to add extra fields to
+        the autocomplete response.
+        """
+        q = Question.objects.create(question='Is this a question?')
+        request = self.factory.get(self.url, {'term': 'is', **self.opts})
+        request.user = self.superuser
+
+        class CustomAutocompleteJsonView(AutocompleteJsonView):
+            def serialize_result(self, obj, to_field_name):
+                result = super().serialize_result(obj, to_field_name)
+                result['extra_field'] = 'extra_value'
+                return result
+
+        response = CustomAutocompleteJsonView.as_view(**self.as_view_args)(request)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content.decode('utf-8'))
+        self.assertEqual(data, {
+            'results': [{
+                'id': str(q.pk),
+                'text': q.question,
+                'extra_field': 'extra_value',
+            }],
+            'pagination': {'more': False},
+        })
 
 
 @override_settings(ROOT_URLCONF='admin_views.urls')
