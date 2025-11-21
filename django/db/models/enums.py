@@ -33,6 +33,10 @@ class ChoicesMeta(enum.EnumMeta):
         cls.label = property(lambda self: cls._value2label_map_.get(self.value))
         return enum.unique(cls)
 
+    @property
+    def do_not_call_in_templates(cls):
+        return True
+
     def __contains__(cls, member):
         if not isinstance(member, enum.Enum):
             # Allow non-enums to match against member values.

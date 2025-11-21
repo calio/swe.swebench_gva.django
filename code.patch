@@ -1,0 +1,81 @@
+diff --git a/django/db/models/enums.py b/django/db/models/enums.py
+index f48143ddaf..b02fa68b08 100644
+--- a/django/db/models/enums.py
++++ b/django/db/models/enums.py
+@@ -33,6 +33,10 @@ class ChoicesMeta(enum.EnumMeta):
+         cls.label = property(lambda self: cls._value2label_map_.get(self.value))
+         return enum.unique(cls)
+ 
++    @property
++    def do_not_call_in_templates(cls):
++        return True
++
+     def __contains__(cls, member):
+         if not isinstance(member, enum.Enum):
+             # Allow non-enums to match against member values.
+diff --git a/tests/model_enums/tests.py b/tests/model_enums/tests.py
+index b9356479de..39f01ee42b 100644
+--- a/tests/model_enums/tests.py
++++ b/tests/model_enums/tests.py
+@@ -4,6 +4,7 @@ import ipaddress
+ import uuid
+ 
+ from django.db import models
++from django.template import Context, Engine
+ from django.test import SimpleTestCase
+ from django.utils.functional import Promise
+ from django.utils.translation import gettext_lazy as _
+@@ -257,3 +258,53 @@ class CustomChoicesTests(SimpleTestCase):
+         with self.assertRaisesMessage(TypeError, msg):
+             class Identifier(uuid.UUID, models.Choices):
+                 A = '972ce4eb-a95f-4a56-9339-68c208a76f18'
++
++
++class ChoicesTemplateTests(SimpleTestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.engine = Engine()
++        super().setUpClass()
++
++    def test_choices_not_called_in_templates(self):
++        """Test that Choices classes are not called in templates."""
++        # Test with TextChoices
++        context = Context({'year': YearInSchool.FRESHMAN})
++        template = self.engine.from_string('{{ year }}')
++        self.assertEqual(template.render(context), 'FR')
++
++    def test_choices_comparison_in_templates(self):
++        """Test that Choices can be compared in templates."""
++        context = Context({
++            'student_year': YearInSchool.FRESHMAN,
++            'YearInSchool': YearInSchool,
++        })
++        template = self.engine.from_string(
++            '{% if student_year == YearInSchool.FRESHMAN %}Freshman{% endif %}'
++        )
++        self.assertEqual(template.render(context), 'Freshman')
++
++    def test_integer_choices_in_templates(self):
++        """Test that IntegerChoices work in templates."""
++        context = Context({'suit': Suit.DIAMOND})
++        template = self.engine.from_string('{{ suit }}')
++        self.assertEqual(template.render(context), '1')
++
++    def test_integer_choices_comparison_in_templates(self):
++        """Test that IntegerChoices can be compared in templates."""
++        context = Context({
++            'player_suit': Suit.DIAMOND,
++            'Suit': Suit,
++        })
++        template = self.engine.from_string(
++            '{% if player_suit == Suit.DIAMOND %}Diamond{% endif %}'
++        )
++        self.assertEqual(template.render(context), 'Diamond')
++
++    def test_choices_attribute_access_in_templates(self):
++        """Test that Choices attributes can be accessed in templates."""
++        context = Context({'YearInSchool': YearInSchool})
++        template = self.engine.from_string('{{ YearInSchool.FRESHMAN }}')
++        # The template should render the enum member, which when converted to string
++        # should give us the value
++        self.assertEqual(template.render(context), 'FR')
