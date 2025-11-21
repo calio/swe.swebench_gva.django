@@ -1,0 +1,65 @@
+diff --git a/django/forms/formsets.py b/django/forms/formsets.py
+index 75b0646512..ea2bc4be77 100644
+--- a/django/forms/formsets.py
++++ b/django/forms/formsets.py
+@@ -402,6 +402,11 @@ class BaseFormSet(RenderableFormMixin):
+                     "Please submit at least %d form.",
+                     "Please submit at least %d forms.", self.min_num) % self.min_num,
+                     code='too_few_forms')
++            if not self.can_add and self.total_form_count() > self.initial_form_count():
++                raise ValidationError(
++                    _('Formset cannot add new forms.'),
++                    code='cannot_add_form',
++                )
+             # Give self.clean() a chance to do cross-form validation.
+             self.clean()
+         except ValidationError as e:
+@@ -476,7 +481,7 @@ class BaseFormSet(RenderableFormMixin):
+ 
+ 
+ def formset_factory(form, formset=BaseFormSet, extra=1, can_order=False,
+-                    can_delete=False, max_num=None, validate_max=False,
++                    can_delete=False, can_add=True, max_num=None, validate_max=False,
+                     min_num=None, validate_min=False, absolute_max=None,
+                     can_delete_extra=True, renderer=None):
+     """Return a FormSet for the given form class."""
+@@ -498,6 +503,7 @@ def formset_factory(form, formset=BaseFormSet, extra=1, can_order=False,
+         'extra': extra,
+         'can_order': can_order,
+         'can_delete': can_delete,
++        'can_add': can_add,
+         'can_delete_extra': can_delete_extra,
+         'min_num': min_num,
+         'max_num': max_num,
+diff --git a/django/forms/models.py b/django/forms/models.py
+index 7effb202e3..aba02d5bdb 100644
+--- a/django/forms/models.py
++++ b/django/forms/models.py
+@@ -820,6 +820,9 @@ class BaseModelFormSet(BaseFormSet):
+             # object.
+             if self.can_delete and self._should_delete_form(form):
+                 continue
++            # If can_add is False, don't save new objects.
++            if not self.can_add:
++                continue
+             self.new_objects.append(self.save_new(form, commit=commit))
+             if not commit:
+                 self.saved_forms.append(form)
+@@ -871,7 +874,7 @@ class BaseModelFormSet(BaseFormSet):
+ 
+ def modelformset_factory(model, form=ModelForm, formfield_callback=None,
+                          formset=BaseModelFormSet, extra=1, can_delete=False,
+-                         can_order=False, max_num=None, fields=None, exclude=None,
++                         can_order=False, can_add=True, max_num=None, fields=None, exclude=None,
+                          widgets=None, validate_max=False, localized_fields=None,
+                          labels=None, help_texts=None, error_messages=None,
+                          min_num=None, validate_min=False, field_classes=None,
+@@ -891,7 +894,7 @@ def modelformset_factory(model, form=ModelForm, formfield_callback=None,
+                              labels=labels, help_texts=help_texts,
+                              error_messages=error_messages, field_classes=field_classes)
+     FormSet = formset_factory(form, formset, extra=extra, min_num=min_num, max_num=max_num,
+-                              can_order=can_order, can_delete=can_delete,
++                              can_order=can_order, can_delete=can_delete, can_add=can_add,
+                               validate_min=validate_min, validate_max=validate_max,
+                               absolute_max=absolute_max, can_delete_extra=can_delete_extra,
+                               renderer=renderer)

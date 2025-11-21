@@ -402,6 +402,11 @@ class BaseFormSet(RenderableFormMixin):
                     "Please submit at least %d form.",
                     "Please submit at least %d forms.", self.min_num) % self.min_num,
                     code='too_few_forms')
+            if not self.can_add and self.total_form_count() > self.initial_form_count():
+                raise ValidationError(
+                    _('Formset cannot add new forms.'),
+                    code='cannot_add_form',
+                )
             # Give self.clean() a chance to do cross-form validation.
             self.clean()
         except ValidationError as e:
@@ -476,7 +481,7 @@ class BaseFormSet(RenderableFormMixin):
 
 
 def formset_factory(form, formset=BaseFormSet, extra=1, can_order=False,
-                    can_delete=False, max_num=None, validate_max=False,
+                    can_delete=False, can_add=True, max_num=None, validate_max=False,
                     min_num=None, validate_min=False, absolute_max=None,
                     can_delete_extra=True, renderer=None):
     """Return a FormSet for the given form class."""
@@ -498,6 +503,7 @@ def formset_factory(form, formset=BaseFormSet, extra=1, can_order=False,
         'extra': extra,
         'can_order': can_order,
         'can_delete': can_delete,
+        'can_add': can_add,
         'can_delete_extra': can_delete_extra,
         'min_num': min_num,
         'max_num': max_num,

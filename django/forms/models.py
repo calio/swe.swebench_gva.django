@@ -820,6 +820,9 @@ class BaseModelFormSet(BaseFormSet):
             # object.
             if self.can_delete and self._should_delete_form(form):
                 continue
+            # If can_add is False, don't save new objects.
+            if not self.can_add:
+                continue
             self.new_objects.append(self.save_new(form, commit=commit))
             if not commit:
                 self.saved_forms.append(form)
@@ -871,7 +874,7 @@ class BaseModelFormSet(BaseFormSet):
 
 def modelformset_factory(model, form=ModelForm, formfield_callback=None,
                          formset=BaseModelFormSet, extra=1, can_delete=False,
-                         can_order=False, max_num=None, fields=None, exclude=None,
+                         can_order=False, can_add=True, max_num=None, fields=None, exclude=None,
                          widgets=None, validate_max=False, localized_fields=None,
                          labels=None, help_texts=None, error_messages=None,
                          min_num=None, validate_min=False, field_classes=None,
@@ -891,7 +894,7 @@ def modelformset_factory(model, form=ModelForm, formfield_callback=None,
                              labels=labels, help_texts=help_texts,
                              error_messages=error_messages, field_classes=field_classes)
     FormSet = formset_factory(form, formset, extra=extra, min_num=min_num, max_num=max_num,
-                              can_order=can_order, can_delete=can_delete,
+                              can_order=can_order, can_delete=can_delete, can_add=can_add,
                               validate_min=validate_min, validate_max=validate_max,
                               absolute_max=absolute_max, can_delete_extra=can_delete_extra,
                               renderer=renderer)
