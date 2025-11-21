@@ -844,6 +844,49 @@ class ChangeListTests(TestCase):
         queryset = m._get_list_editable_queryset(request, prefix='form')
         self.assertEqual(queryset.count(), 2)
 
+    def test_get_edited_object_pks_with_regex_special_chars(self):
+        """
+        Test that _get_edited_object_pks correctly handles formset prefixes
+        containing regex special characters.
+        """
+        a = Swallow.objects.create(origin='Swallow A', load=4, speed=1)
+        b = Swallow.objects.create(origin='Swallow B', load=2, speed=2)
+        changelist_url = reverse('admin:admin_changelist_swallow_changelist')
+        m = SwallowAdmin(Swallow, custom_site)
+        
+        # Test with prefix containing regex special characters
+        # Using a prefix like "form.test" which contains a dot (regex metachar)
+        prefix_with_dot = 'form.test'
+        data = {
+            'form.test-TOTAL_FORMS': '2',
+            'form.test-INITIAL_FORMS': '2',
+            'form.test-MIN_NUM_FORMS': '0',
+            'form.test-MAX_NUM_FORMS': '1000',
+            'form.test-0-uuid': str(a.pk),
+            'form.test-1-uuid': str(b.pk),
+            'form.test-0-load': '10',
+            '_save': 'Save',
+        }
+        request = self.factory.post(changelist_url, data=data)
+        pks = m._get_edited_object_pks(request, prefix=prefix_with_dot)
+        # Should correctly extract both UUIDs despite the dot in the prefix
+        self.assertEqual(sorted(pks), sorted([str(a.pk), str(b.pk)]))
+        
+        # Test with other regex special characters
+        prefix_with_brackets = 'form[test]'
+        data = {
+            'form[test]-TOTAL_FORMS': '1',
+            'form[test]-INITIAL_FORMS': '1',
+            'form[test]-MIN_NUM_FORMS': '0',
+            'form[test]-MAX_NUM_FORMS': '1000',
+            'form[test]-0-uuid': str(a.pk),
+            'form[test]-0-load': '10',
+            '_save': 'Save',
+        }
+        request = self.factory.post(changelist_url, data=data)
+        pks = m._get_edited_object_pks(request, prefix=prefix_with_brackets)
+        self.assertEqual(pks, [str(a.pk)])
+
     def test_changelist_view_list_editable_changed_objects_uses_filter(self):
         """list_editable edits use a filtered queryset to limit memory usage."""
         a = Swallow.objects.create(origin='Swallow A', load=4, speed=1)
