@@ -1,0 +1,12 @@
+2025-11-18 22:17:30,388 - gv_client_debug - INFO - REQUEST [litellm]: gemini/gemini-3.0-pro
+2025-11-18 22:17:30,388 - gv_client_debug - DEBUG - Messages count: 2
+2025-11-18 22:17:30,388 - gv_client_debug - DEBUG - Tools count: 18
+2025-11-18 22:17:30,670 - gv_client_debug - INFO - RESPONSE [FAILED]: 0.28s
+2025-11-18 22:17:30,670 - gv_client_debug - ERROR - Error: litellm.NotFoundError: VertexAIException - {
+  "error": {
+    "code": 404,
+    "message": "models/gemini-3.0-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+    "status": "NOT_FOUND"
+  }
+}
+

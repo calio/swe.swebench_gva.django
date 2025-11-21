@@ -267,15 +267,15 @@ class WriterTests(SimpleTestCase):
 
         self.assertSerializedResultEqual(
             TextEnum.A,
-            ("migrations.test_writer.TextEnum('a-value')", {'import migrations.test_writer'})
+            ("migrations.test_writer.TextEnum['A']", {'import migrations.test_writer'})
         )
         self.assertSerializedResultEqual(
             BinaryEnum.A,
-            ("migrations.test_writer.BinaryEnum(b'a-value')", {'import migrations.test_writer'})
+            ("migrations.test_writer.BinaryEnum['A']", {'import migrations.test_writer'})
         )
         self.assertSerializedResultEqual(
             IntEnum.B,
-            ("migrations.test_writer.IntEnum(2)", {'import migrations.test_writer'})
+            ("migrations.test_writer.IntEnum['B']", {'import migrations.test_writer'})
         )
 
         field = models.CharField(default=TextEnum.B, choices=[(m.value, m) for m in TextEnum])
@@ -283,27 +283,27 @@ class WriterTests(SimpleTestCase):
         self.assertEqual(
             string,
             "models.CharField(choices=["
-            "('a-value', migrations.test_writer.TextEnum('a-value')), "
-            "('value-b', migrations.test_writer.TextEnum('value-b'))], "
-            "default=migrations.test_writer.TextEnum('value-b'))"
+            "('a-value', migrations.test_writer.TextEnum['A']), "
+            "('value-b', migrations.test_writer.TextEnum['B'])], "
+            "default=migrations.test_writer.TextEnum['B'])"
         )
         field = models.CharField(default=BinaryEnum.B, choices=[(m.value, m) for m in BinaryEnum])
         string = MigrationWriter.serialize(field)[0]
         self.assertEqual(
             string,
             "models.CharField(choices=["
-            "(b'a-value', migrations.test_writer.BinaryEnum(b'a-value')), "
-            "(b'value-b', migrations.test_writer.BinaryEnum(b'value-b'))], "
-            "default=migrations.test_writer.BinaryEnum(b'value-b'))"
+            "(b'a-value', migrations.test_writer.BinaryEnum['A']), "
+            "(b'value-b', migrations.test_writer.BinaryEnum['B'])], "
+            "default=migrations.test_writer.BinaryEnum['B'])"
         )
         field = models.IntegerField(default=IntEnum.A, choices=[(m.value, m) for m in IntEnum])
         string = MigrationWriter.serialize(field)[0]
         self.assertEqual(
             string,
             "models.IntegerField(choices=["
-            "(1, migrations.test_writer.IntEnum(1)), "
-            "(2, migrations.test_writer.IntEnum(2))], "
-            "default=migrations.test_writer.IntEnum(1))"
+            "(1, migrations.test_writer.IntEnum['A']), "
+            "(2, migrations.test_writer.IntEnum['B'])], "
+            "default=migrations.test_writer.IntEnum['A'])"
         )
 
     def test_serialize_choices(self):
@@ -319,24 +319,31 @@ class WriterTests(SimpleTestCase):
             DATE_1 = 1969, 7, 20, 'First date'
             DATE_2 = 1969, 11, 19, 'Second date'
 
-        self.assertSerializedResultEqual(TextChoices.A, ("'A'", set()))
-        self.assertSerializedResultEqual(IntegerChoices.A, ('1', set()))
+        self.assertSerializedResultEqual(
+            TextChoices.A,
+            ("migrations.test_writer.TextChoices['A']", {'import migrations.test_writer'})
+        )
+        self.assertSerializedResultEqual(
+            IntegerChoices.A,
+            ("migrations.test_writer.IntegerChoices['A']", {'import migrations.test_writer'})
+        )
         self.assertSerializedResultEqual(
             DateChoices.DATE_1,
-            ('datetime.date(1969, 7, 20)', {'import datetime'}),
+            ("migrations.test_writer.DateChoices['DATE_1']", {'import migrations.test_writer'}),
         )
         field = models.CharField(default=TextChoices.B, choices=TextChoices.choices)
         string = MigrationWriter.serialize(field)[0]
         self.assertEqual(
             string,
             "models.CharField(choices=[('A', 'A value'), ('B', 'B value')], "
-            "default='B')",
+            "default=migrations.test_writer.TextChoices['B'])",
         )
         field = models.IntegerField(default=IntegerChoices.B, choices=IntegerChoices.choices)
         string = MigrationWriter.serialize(field)[0]
         self.assertEqual(
             string,
-            "models.IntegerField(choices=[(1, 'One'), (2, 'Two')], default=2)",
+            "models.IntegerField(choices=[(1, 'One'), (2, 'Two')], "
+            "default=migrations.test_writer.IntegerChoices['B'])",
         )
         field = models.DateField(default=DateChoices.DATE_2, choices=DateChoices.choices)
         string = MigrationWriter.serialize(field)[0]
@@ -345,7 +352,7 @@ class WriterTests(SimpleTestCase):
             "models.DateField(choices=["
             "(datetime.date(1969, 7, 20), 'First date'), "
             "(datetime.date(1969, 11, 19), 'Second date')], "
-            "default=datetime.date(1969, 11, 19))"
+            "default=migrations.test_writer.DateChoices['DATE_2'])"
         )
 
     def test_serialize_uuid(self):
@@ -454,7 +461,7 @@ class WriterTests(SimpleTestCase):
         # Test a string regex with flag
         validator = RegexValidator(r'^[0-9]+$', flags=re.S)
         string = MigrationWriter.serialize(validator)[0]
-        self.assertEqual(string, "django.core.validators.RegexValidator('^[0-9]+$', flags=re.RegexFlag(16))")
+        self.assertEqual(string, "django.core.validators.RegexValidator('^[0-9]+$', flags=re.RegexFlag['DOTALL'])")
         self.serialize_round_trip(validator)
 
         # Test message and code
