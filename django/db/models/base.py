@@ -1707,6 +1707,9 @@ class Model(metaclass=ModelBase):
             _cls = cls
             fld = None
             for part in field.split(LOOKUP_SEP):
+                # pk is an alias and won't be found by get_field().
+                if part == 'pk':
+                    continue
                 try:
                     fld = _cls._meta.get_field(part)
                     if fld.is_relation:
