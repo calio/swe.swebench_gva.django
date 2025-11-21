@@ -1,0 +1,103 @@
+diff --git a/django/db/backends/mysql/operations.py b/django/db/backends/mysql/operations.py
+index 50f85e0621..406bd873a0 100644
+--- a/django/db/backends/mysql/operations.py
++++ b/django/db/backends/mysql/operations.py
+@@ -70,7 +70,11 @@ class DatabaseOperations(BaseDatabaseOperations):
+ 
+     def _convert_field_to_tz(self, field_name, tzname):
+         if settings.USE_TZ:
+-            field_name = "CONVERT_TZ(%s, 'UTC', '%s')" % (field_name, tzname)
++            # Convert from the database's timezone to the target timezone.
++            # The database stores datetimes in its own timezone (connection.timezone_name),
++            # so we need to convert from that timezone to the target timezone.
++            db_tzname = self.connection.timezone_name
++            field_name = "CONVERT_TZ(%s, '%s', '%s')" % (field_name, db_tzname, tzname)
+         return field_name
+ 
+     def datetime_cast_date_sql(self, field_name, tzname):
+diff --git a/django/db/backends/oracle/operations.py b/django/db/backends/oracle/operations.py
+index c1afb2ed5e..110aa0179d 100644
+--- a/django/db/backends/oracle/operations.py
++++ b/django/db/backends/oracle/operations.py
+@@ -99,9 +99,15 @@ END;
+             return field_name
+         if not self._tzname_re.match(tzname):
+             raise ValueError("Invalid time zone name: %s" % tzname)
+-        # Convert from UTC to local time, returning TIMESTAMP WITH TIME ZONE
++        # Convert from the database's timezone to the target timezone.
++        # The database stores datetimes in its own timezone (connection.timezone_name),
++        # so we need to convert from that timezone to the target timezone.
++        db_tzname = self.connection.timezone_name
++        if not self._tzname_re.match(db_tzname):
++            raise ValueError("Invalid time zone name: %s" % db_tzname)
++        # Convert from the database timezone to the target timezone, returning TIMESTAMP WITH TIME ZONE
+         # and cast it back to TIMESTAMP to strip the TIME ZONE details.
+-        return "CAST((FROM_TZ(%s, '0:00') AT TIME ZONE '%s') AS TIMESTAMP)" % (field_name, tzname)
++        return "CAST((FROM_TZ(%s, '%s') AT TIME ZONE '%s') AS TIMESTAMP)" % (field_name, db_tzname, tzname)
+ 
+     def datetime_cast_date_sql(self, field_name, tzname):
+         field_name = self._convert_field_to_tz(field_name, tzname)
+diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py
+index 6a19236c48..eab0d26dc3 100644
+--- a/django/db/backends/sqlite3/base.py
++++ b/django/db/backends/sqlite3/base.py
+@@ -406,7 +406,25 @@ def _sqlite_datetime_parse(dt, tzname=None):
+     except (TypeError, ValueError):
+         return None
+     if tzname is not None:
+-        dt = timezone.localtime(dt, pytz.timezone(tzname))
++        # tzname may be encoded as "db_tz:target_tz" to support per-database timezones.
++        # If it contains a colon, split it and use the database timezone and target timezone.
++        if ':' in tzname:
++            db_tzname, target_tzname = tzname.split(':', 1)
++            # The datetime is stored in the database timezone, so we need to
++            # first make it aware in that timezone, then convert to the target timezone.
++            db_tz = pytz.timezone(db_tzname)
++            # Make the datetime aware in the database timezone
++            if timezone.is_aware(dt):
++                # If it's already aware, replace the tzinfo
++                dt = dt.replace(tzinfo=db_tz)
++            else:
++                dt = timezone.make_aware(dt, db_tz)
++            # Convert to the target timezone
++            dt = timezone.localtime(dt, pytz.timezone(target_tzname))
++        else:
++            # For backward compatibility, if tzname doesn't contain a colon,
++            # assume it's the target timezone and the datetime is in UTC.
++            dt = timezone.localtime(dt, pytz.timezone(tzname))
+     return dt
+ 
+ 
+diff --git a/django/db/backends/sqlite3/operations.py b/django/db/backends/sqlite3/operations.py
+index c4b02e5c60..98ea82c0e2 100644
+--- a/django/db/backends/sqlite3/operations.py
++++ b/django/db/backends/sqlite3/operations.py
+@@ -85,7 +85,14 @@ class DatabaseOperations(BaseDatabaseOperations):
+         return "django_time_trunc('%s', %s)" % (lookup_type.lower(), field_name)
+ 
+     def _convert_tzname_to_sql(self, tzname):
+-        return "'%s'" % tzname if settings.USE_TZ else 'NULL'
++        if not settings.USE_TZ:
++            return 'NULL'
++        # Encode both the database timezone and the target timezone in a single parameter.
++        # Format: "db_tz:target_tz" where db_tz is the database's timezone and target_tz is the target timezone.
++        # If tzname is None, use the database's timezone as the target timezone.
++        db_tzname = self.connection.timezone_name
++        target_tzname = tzname if tzname is not None else db_tzname
++        return "'%s:%s'" % (db_tzname, target_tzname)
+ 
+     def datetime_cast_date_sql(self, field_name, tzname):
+         return "django_datetime_cast_date(%s, %s)" % (
+diff --git a/django/db/models/functions/datetime.py b/django/db/models/functions/datetime.py
+index 7a582aa404..d4b4cf799a 100644
+--- a/django/db/models/functions/datetime.py
++++ b/django/db/models/functions/datetime.py
+@@ -14,7 +14,7 @@ from django.utils import timezone
+ class TimezoneMixin:
+     tzinfo = None
+ 
+-    def get_tzname(self):
++    def get_tzname(self, connection=None):
+         # Timezone conversions must happen to the input datetime *before*
+         # applying a function. 2015-12-31 23:00:00 -02:00 is stored in the
+         # database as 2016-01-01 01:00:00 +00:00. Any results should be

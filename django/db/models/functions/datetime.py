@@ -14,7 +14,7 @@ from django.utils import timezone
 class TimezoneMixin:
     tzinfo = None
 
-    def get_tzname(self):
+    def get_tzname(self, connection=None):
         # Timezone conversions must happen to the input datetime *before*
         # applying a function. 2015-12-31 23:00:00 -02:00 is stored in the
         # database as 2016-01-01 01:00:00 +00:00. Any results should be

@@ -85,7 +85,14 @@ class DatabaseOperations(BaseDatabaseOperations):
         return "django_time_trunc('%s', %s)" % (lookup_type.lower(), field_name)
 
     def _convert_tzname_to_sql(self, tzname):
-        return "'%s'" % tzname if settings.USE_TZ else 'NULL'
+        if not settings.USE_TZ:
+            return 'NULL'
+        # Encode both the database timezone and the target timezone in a single parameter.
+        # Format: "db_tz:target_tz" where db_tz is the database's timezone and target_tz is the target timezone.
+        # If tzname is None, use the database's timezone as the target timezone.
+        db_tzname = self.connection.timezone_name
+        target_tzname = tzname if tzname is not None else db_tzname
+        return "'%s:%s'" % (db_tzname, target_tzname)
 
     def datetime_cast_date_sql(self, field_name, tzname):
         return "django_datetime_cast_date(%s, %s)" % (

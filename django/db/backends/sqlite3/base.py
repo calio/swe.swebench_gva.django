@@ -406,7 +406,25 @@ def _sqlite_datetime_parse(dt, tzname=None):
     except (TypeError, ValueError):
         return None
     if tzname is not None:
-        dt = timezone.localtime(dt, pytz.timezone(tzname))
+        # tzname may be encoded as "db_tz:target_tz" to support per-database timezones.
+        # If it contains a colon, split it and use the database timezone and target timezone.
+        if ':' in tzname:
+            db_tzname, target_tzname = tzname.split(':', 1)
+            # The datetime is stored in the database timezone, so we need to
+            # first make it aware in that timezone, then convert to the target timezone.
+            db_tz = pytz.timezone(db_tzname)
+            # Make the datetime aware in the database timezone
+            if timezone.is_aware(dt):
+                # If it's already aware, replace the tzinfo
+                dt = dt.replace(tzinfo=db_tz)
+            else:
+                dt = timezone.make_aware(dt, db_tz)
+            # Convert to the target timezone
+            dt = timezone.localtime(dt, pytz.timezone(target_tzname))
+        else:
+            # For backward compatibility, if tzname doesn't contain a colon,
+            # assume it's the target timezone and the datetime is in UTC.
+            dt = timezone.localtime(dt, pytz.timezone(tzname))
     return dt
 
 
