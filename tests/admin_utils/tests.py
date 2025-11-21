@@ -195,6 +195,19 @@ class UtilsTests(SimpleTestCase):
                     display_value,
                 )
 
+    def test_json_display_for_field_with_unicode(self):
+        """Unicode characters should be preserved in admin display."""
+        tests = [
+            ({'name': '中国', 'city': '北京'}, '{"name": "中国", "city": "北京"}'),
+            ({'emoji': '😀', 'text': 'café'}, '{"emoji": "😀", "text": "café"}'),
+        ]
+        for value, display_value in tests:
+            with self.subTest(value=value):
+                self.assertEqual(
+                    display_for_field(value, models.JSONField(), self.empty_value),
+                    display_value,
+                )
+
     def test_number_formats_display_for_field(self):
         display_value = display_for_field(12345.6789, models.FloatField(), self.empty_value)
         self.assertEqual(display_value, '12345.6789')

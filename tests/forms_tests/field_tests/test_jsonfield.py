@@ -30,6 +30,20 @@ class JSONFieldTest(SimpleTestCase):
         self.assertEqual(field.prepare_value(None), 'null')
         self.assertEqual(field.prepare_value('foo'), '"foo"')
 
+    def test_prepare_value_with_unicode(self):
+        """Unicode characters should be preserved, not escaped."""
+        field = JSONField()
+        # Test with Chinese characters
+        self.assertEqual(
+            field.prepare_value({'name': '中国', 'city': '北京'}),
+            '{"name": "中国", "city": "北京"}'
+        )
+        # Test with other Unicode characters
+        self.assertEqual(
+            field.prepare_value({'emoji': '😀', 'text': 'café'}),
+            '{"emoji": "😀", "text": "café"}'
+        )
+
     def test_widget(self):
         field = JSONField()
         self.assertIsInstance(field.widget, Textarea)

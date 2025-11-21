@@ -1,0 +1,84 @@
+diff --git a/django/db/models/fields/json.py b/django/db/models/fields/json.py
+index a249f4cdbf..66c039c6e4 100644
+--- a/django/db/models/fields/json.py
++++ b/django/db/models/fields/json.py
+@@ -81,7 +81,7 @@ class JSONField(CheckFieldDefaultMixin, Field):
+     def get_prep_value(self, value):
+         if value is None:
+             return value
+-        return json.dumps(value, cls=self.encoder)
++        return json.dumps(value, cls=self.encoder, ensure_ascii=False)
+ 
+     def get_transform(self, name):
+         transform = super().get_transform(name)
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index 9de2c60b35..8ba0013871 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -1258,7 +1258,7 @@ class JSONField(CharField):
+     def prepare_value(self, value):
+         if isinstance(value, InvalidJSONInput):
+             return value
+-        return json.dumps(value, cls=self.encoder)
++        return json.dumps(value, cls=self.encoder, ensure_ascii=False)
+ 
+     def has_changed(self, initial, data):
+         if super().has_changed(initial, data):
+@@ -1266,6 +1266,6 @@ class JSONField(CharField):
+         # For purposes of seeing whether something has changed, True isn't the
+         # same as 1 and the order of keys doesn't matter.
+         return (
+-            json.dumps(initial, sort_keys=True, cls=self.encoder) !=
+-            json.dumps(self.to_python(data), sort_keys=True, cls=self.encoder)
++            json.dumps(initial, sort_keys=True, cls=self.encoder, ensure_ascii=False) !=
++            json.dumps(self.to_python(data), sort_keys=True, cls=self.encoder, ensure_ascii=False)
+         )
+diff --git a/tests/admin_utils/tests.py b/tests/admin_utils/tests.py
+index a7594deda8..edba9d7bb1 100644
+--- a/tests/admin_utils/tests.py
++++ b/tests/admin_utils/tests.py
+@@ -195,6 +195,19 @@ class UtilsTests(SimpleTestCase):
+                     display_value,
+                 )
+ 
++    def test_json_display_for_field_with_unicode(self):
++        """Unicode characters should be preserved in admin display."""
++        tests = [
++            ({'name': '中国', 'city': '北京'}, '{"name": "中国", "city": "北京"}'),
++            ({'emoji': '😀', 'text': 'café'}, '{"emoji": "😀", "text": "café"}'),
++        ]
++        for value, display_value in tests:
++            with self.subTest(value=value):
++                self.assertEqual(
++                    display_for_field(value, models.JSONField(), self.empty_value),
++                    display_value,
++                )
++
+     def test_number_formats_display_for_field(self):
+         display_value = display_for_field(12345.6789, models.FloatField(), self.empty_value)
+         self.assertEqual(display_value, '12345.6789')
+diff --git a/tests/forms_tests/field_tests/test_jsonfield.py b/tests/forms_tests/field_tests/test_jsonfield.py
+index 915b180d0c..72fe712849 100644
+--- a/tests/forms_tests/field_tests/test_jsonfield.py
++++ b/tests/forms_tests/field_tests/test_jsonfield.py
+@@ -30,6 +30,20 @@ class JSONFieldTest(SimpleTestCase):
+         self.assertEqual(field.prepare_value(None), 'null')
+         self.assertEqual(field.prepare_value('foo'), '"foo"')
+ 
++    def test_prepare_value_with_unicode(self):
++        """Unicode characters should be preserved, not escaped."""
++        field = JSONField()
++        # Test with Chinese characters
++        self.assertEqual(
++            field.prepare_value({'name': '中国', 'city': '北京'}),
++            '{"name": "中国", "city": "北京"}'
++        )
++        # Test with other Unicode characters
++        self.assertEqual(
++            field.prepare_value({'emoji': '😀', 'text': 'café'}),
++            '{"emoji": "😀", "text": "café"}'
++        )
++
+     def test_widget(self):
+         field = JSONField()
+         self.assertIsInstance(field.widget, Textarea)
