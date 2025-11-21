@@ -3614,3 +3614,86 @@ class ModelToDictTests(TestCase):
         # If data were a QuerySet, it would be reevaluated here and give "red"
         # instead of the original value.
         self.assertEqual(data, [blue])
+
+
+class FormfieldCallbackTests(TestCase):
+    """Tests for formfield_callback in ModelForm Meta."""
+
+    def test_modelform_factory_respects_meta_formfield_callback(self):
+        """
+        modelform_factory should respect formfield_callback from the base
+        form's Meta class when no formfield_callback is explicitly passed.
+        Regression test for #15916.
+        """
+
+        def all_required(field, **kwargs):
+            """Make all fields required."""
+            formfield = field.formfield(**kwargs)
+            formfield.required = True
+            return formfield
+
+        class MyForm(forms.ModelForm):
+            formfield_callback = all_required
+
+            class Meta:
+                model = Product
+                formfield_callback = all_required
+                fields = ["slug"]
+
+        # Create form directly - should have required fields
+        form1 = MyForm()
+        self.assertTrue(form1.fields["slug"].required, "Direct form should have required field")
+
+        # Create form via modelform_factory without explicit formfield_callback
+        # Should inherit the callback from MyForm's Meta
+        FactoryForm = modelform_factory(
+            Product, form=MyForm, fields=["slug"]
+        )
+        form2 = FactoryForm()
+        self.assertTrue(
+            form2.fields["slug"].required,
+            "Factory form should respect formfield_callback from base form's Meta",
+        )
+
+        # Create form via modelform_factory with explicit formfield_callback
+        FactoryForm2 = modelform_factory(
+            Product,
+            form=MyForm,
+            fields=["slug"],
+            formfield_callback=all_required,
+        )
+        form3 = FactoryForm2()
+        self.assertTrue(form3.fields["slug"].required)
+
+    def test_modelform_factory_with_meta_formfield_callback_and_inheritance(self):
+        """
+        When modelform_factory creates a form that inherits from a base form
+        with formfield_callback in Meta, the callback should be preserved
+        through inheritance chain.
+        """
+
+        def make_required(field, **kwargs):
+            """Make all fields required."""
+            formfield = field.formfield(**kwargs)
+            formfield.required = True
+            return formfield
+
+        class BaseForm(forms.ModelForm):
+            class Meta:
+                model = Product
+                formfield_callback = make_required
+                fields = ["slug"]
+
+        # Create a factory form without passing formfield_callback
+        FactoryForm = modelform_factory(Product, form=BaseForm, fields=["slug"])
+
+        # Create an inherited form from the factory form
+        class InheritedForm(FactoryForm):
+            pass
+
+        # The inherited form should still have the callback applied
+        form = InheritedForm()
+        self.assertTrue(
+            form.fields["slug"].required,
+            "Inherited form should preserve formfield_callback from base form's Meta",
+        )
