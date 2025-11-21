@@ -1,0 +1,103 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index d517d7269b..c2aea9c730 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -914,7 +914,7 @@ class ForeignKey(ForeignObject):
+             return
+ 
+         using = router.db_for_read(self.remote_field.model, instance=model_instance)
+-        qs = self.remote_field.model._default_manager.using(using).filter(
++        qs = self.remote_field.model._base_manager.using(using).filter(
+             **{self.remote_field.field_name: value}
+         )
+         qs = qs.complex_filter(self.get_limit_choices_to())
+diff --git a/tests/validation/models.py b/tests/validation/models.py
+index 47fb895ec5..bd261ae3a4 100644
+--- a/tests/validation/models.py
++++ b/tests/validation/models.py
+@@ -118,6 +118,31 @@ class GenericIPAddrUnpackUniqueTest(models.Model):
+     generic_v4unpack_ip = models.GenericIPAddressField(null=True, blank=True, unique=True, unpack_ipv4=True)
+ 
+ 
++class ArchivedArticleManager(models.Manager):
++    """Manager that filters out archived articles by default."""
++    def get_queryset(self):
++        qs = super().get_queryset()
++        return qs.filter(archived=False)
++
++
++class ArchivedArticle(models.Model):
++    """Article model with a custom manager that filters archived articles."""
++    title = models.CharField(max_length=100)
++    archived = models.BooleanField(default=False)
++    objects = ArchivedArticleManager()
++
++    class Meta:
++        app_label = 'validation'
++
++
++class FavoriteArchivedArticle(models.Model):
++    """Model that references ArchivedArticle via ForeignKey."""
++    article = models.ForeignKey(ArchivedArticle, on_delete=models.CASCADE)
++
++    class Meta:
++        app_label = 'validation'
++
++
+ # A model can't have multiple AutoFields
+ # Refs #12467.
+ assertion_error = None
+diff --git a/tests/validation/tests.py b/tests/validation/tests.py
+index 46fe2f0c7b..8992637cf1 100644
+--- a/tests/validation/tests.py
++++ b/tests/validation/tests.py
+@@ -6,7 +6,7 @@ from django.utils.functional import lazy
+ from . import ValidationAssertions
+ from .models import (
+     Article, Author, GenericIPAddressTestModel, GenericIPAddrUnpackUniqueTest,
+-    ModelToValidate,
++    ModelToValidate, ArchivedArticle, FavoriteArchivedArticle,
+ )
+ 
+ 
+@@ -194,3 +194,40 @@ class GenericIPAddressFieldTests(ValidationAssertions, TestCase):
+         self.assertIsNone(giptm.full_clean())
+         giptm = GenericIPAddressTestModel(generic_ip=None)
+         self.assertIsNone(giptm.full_clean())
++
++
++class ForeignKeyValidationWithFilteredManagerTests(ValidationAssertions, TestCase):
++    """
++    Tests for ForeignKey validation with custom managers that filter objects.
++    Regression test for issue where ForeignKey.validate() uses _default_manager
++    instead of _base_manager, preventing validation of objects filtered out by
++    the default manager.
++    """
++
++    def test_fk_validation_with_filtered_manager(self):
++        """
++        ForeignKey validation should use _base_manager to allow validation
++        of objects that are filtered out by the default manager.
++        """
++        # Create an archived article using the base manager
++        archived_article = ArchivedArticle._base_manager.create(
++            title='Archived Article',
++            archived=True
++        )
++
++        # Create a FavoriteArchivedArticle instance with the archived article
++        favorite = FavoriteArchivedArticle(article_id=archived_article.id)
++
++        # This should not raise a validation error because the ForeignKey
++        # validation should use _base_manager to check if the article exists
++        self.assertIsNone(favorite.full_clean())
++
++    def test_fk_validation_with_non_existent_object(self):
++        """
++        ForeignKey validation should still fail for non-existent objects.
++        """
++        # Try to create a FavoriteArchivedArticle with a non-existent article ID
++        favorite = FavoriteArchivedArticle(article_id=9999)
++
++        # This should raise a validation error
++        self.assertFailsValidation(favorite.full_clean, ['article'])

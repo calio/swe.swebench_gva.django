@@ -6,7 +6,7 @@ from django.utils.functional import lazy
 from . import ValidationAssertions
 from .models import (
     Article, Author, GenericIPAddressTestModel, GenericIPAddrUnpackUniqueTest,
-    ModelToValidate,
+    ModelToValidate, ArchivedArticle, FavoriteArchivedArticle,
 )
 
 
@@ -194,3 +194,40 @@ class GenericIPAddressFieldTests(ValidationAssertions, TestCase):
         self.assertIsNone(giptm.full_clean())
         giptm = GenericIPAddressTestModel(generic_ip=None)
         self.assertIsNone(giptm.full_clean())
+
+
+class ForeignKeyValidationWithFilteredManagerTests(ValidationAssertions, TestCase):
+    """
+    Tests for ForeignKey validation with custom managers that filter objects.
+    Regression test for issue where ForeignKey.validate() uses _default_manager
+    instead of _base_manager, preventing validation of objects filtered out by
+    the default manager.
+    """
+
+    def test_fk_validation_with_filtered_manager(self):
+        """
+        ForeignKey validation should use _base_manager to allow validation
+        of objects that are filtered out by the default manager.
+        """
+        # Create an archived article using the base manager
+        archived_article = ArchivedArticle._base_manager.create(
+            title='Archived Article',
+            archived=True
+        )
+
+        # Create a FavoriteArchivedArticle instance with the archived article
+        favorite = FavoriteArchivedArticle(article_id=archived_article.id)
+
+        # This should not raise a validation error because the ForeignKey
+        # validation should use _base_manager to check if the article exists
+        self.assertIsNone(favorite.full_clean())
+
+    def test_fk_validation_with_non_existent_object(self):
+        """
+        ForeignKey validation should still fail for non-existent objects.
+        """
+        # Try to create a FavoriteArchivedArticle with a non-existent article ID
+        favorite = FavoriteArchivedArticle(article_id=9999)
+
+        # This should raise a validation error
+        self.assertFailsValidation(favorite.full_clean, ['article'])
