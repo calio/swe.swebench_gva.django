@@ -1905,6 +1905,36 @@ class ExistsTests(TestCase):
         )
         self.assertNotIn('ORDER BY', captured_sql)
 
+    def test_filter_with_empty_exists_subquery(self):
+        # Test for issue #15382 - filter on exists-subquery with empty queryset
+        # should not remove the whole WHERE block
+        qs = Experiment.objects.filter(
+            ~Exists(Experiment.objects.none()),
+            name='test'
+        )
+        # Should not raise EmptyResultSet
+        sql = str(qs.query)
+        # WHERE clause should be present
+        self.assertIn('WHERE', sql)
+        # Should contain the name filter
+        self.assertIn('name', sql)
+
+    def test_filter_with_negated_empty_exists_subquery(self):
+        # Test for issue #15382 - negated exists with empty queryset
+        qs = Experiment.objects.filter(~Exists(Experiment.objects.none()))
+        # Should not raise EmptyResultSet
+        sql = str(qs.query)
+        # WHERE clause should be present
+        self.assertIn('WHERE', sql)
+
+    def test_filter_with_empty_exists_subquery_no_other_filters(self):
+        # Test for issue #15382 - exists with empty queryset without other filters
+        qs = Experiment.objects.filter(Exists(Experiment.objects.none()))
+        # Should not raise EmptyResultSet
+        sql = str(qs.query)
+        # WHERE clause should be present
+        self.assertIn('WHERE', sql)
+
 
 class FieldTransformTests(TestCase):
 

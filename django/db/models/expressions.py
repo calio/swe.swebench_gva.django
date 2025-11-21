@@ -1199,6 +1199,7 @@ class Subquery(BaseExpression, Combinable):
 class Exists(Subquery):
     template = 'EXISTS(%(subquery)s)'
     output_field = fields.BooleanField()
+    empty_result_set_value = False
 
     def __init__(self, queryset, negated=False, **kwargs):
         self.negated = negated
@@ -1211,13 +1212,20 @@ class Exists(Subquery):
 
     def as_sql(self, compiler, connection, template=None, **extra_context):
         query = self.query.exists(using=connection.alias)
-        sql, params = super().as_sql(
-            compiler,
-            connection,
-            template=template,
-            query=query,
-            **extra_context,
-        )
+        try:
+            sql, params = super().as_sql(
+                compiler,
+                connection,
+                template=template,
+                query=query,
+                **extra_context,
+            )
+        except EmptyResultSet:
+            empty_result_set_value = self.empty_result_set_value
+            if empty_result_set_value is NotImplemented:
+                raise
+            # Use the empty_result_set_value to generate SQL
+            sql, params = compiler.compile(Value(empty_result_set_value))
         if self.negated:
             sql = 'NOT {}'.format(sql)
         return sql, params
