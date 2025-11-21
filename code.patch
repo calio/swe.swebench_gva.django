@@ -1,0 +1,64 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index dddf7c679c..ca5910af4f 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -137,11 +137,17 @@ class CreateModel(ModelOperation):
+                 ),
+             ]
+         elif isinstance(operation, AlterModelOptions) and self.name_lower == operation.name_lower:
++            new_options = {**self.options, **operation.options}
++            # Remove options not found in operation.options, following the same logic as
++            # AlterModelOptions.state_forwards()
++            for key in operation.ALTER_OPTION_KEYS:
++                if key not in operation.options:
++                    new_options.pop(key, None)
+             return [
+                 CreateModel(
+                     self.name,
+                     fields=self.fields,
+-                    options={**self.options, **operation.options},
++                    options=new_options,
+                     bases=self.bases,
+                     managers=self.managers,
+                 ),
+diff --git a/tests/migrations/test_optimizer.py b/tests/migrations/test_optimizer.py
+index 2950635514..1b7cfea27d 100644
+--- a/tests/migrations/test_optimizer.py
++++ b/tests/migrations/test_optimizer.py
+@@ -119,6 +119,36 @@ class OptimizerTests(SimpleTestCase):
+             ]
+         )
+ 
++    def test_create_alter_model_options_empty(self):
++        """
++        CreateModel with options followed by AlterModelOptions with empty options
++        should result in CreateModel with empty options (options should be cleared).
++        """
++        self.assertOptimizesTo(
++            [
++                migrations.CreateModel('Foo', fields=[], options={'verbose_name': 'Foo Model', 'verbose_name_plural': 'Foo Models'}),
++                migrations.AlterModelOptions(name='Foo', options={}),
++            ],
++            [
++                migrations.CreateModel('Foo', fields=[], options={}),
++            ]
++        )
++
++    def test_create_alter_model_options_partial(self):
++        """
++        CreateModel with options followed by AlterModelOptions with partial options
++        should result in CreateModel with only the specified options (others cleared).
++        """
++        self.assertOptimizesTo(
++            [
++                migrations.CreateModel('Foo', fields=[], options={'verbose_name': 'Foo Model', 'verbose_name_plural': 'Foo Models', 'ordering': ['id']}),
++                migrations.AlterModelOptions(name='Foo', options={'verbose_name': 'New Foo'}),
++            ],
++            [
++                migrations.CreateModel('Foo', fields=[], options={'verbose_name': 'New Foo'}),
++            ]
++        )
++
+     def _test_create_alter_foo_delete_model(self, alter_foo):
+         """
+         CreateModel, AlterModelTable, AlterUniqueTogether/AlterIndexTogether/

@@ -137,11 +137,17 @@ class CreateModel(ModelOperation):
                 ),
             ]
         elif isinstance(operation, AlterModelOptions) and self.name_lower == operation.name_lower:
+            new_options = {**self.options, **operation.options}
+            # Remove options not found in operation.options, following the same logic as
+            # AlterModelOptions.state_forwards()
+            for key in operation.ALTER_OPTION_KEYS:
+                if key not in operation.options:
+                    new_options.pop(key, None)
             return [
                 CreateModel(
                     self.name,
                     fields=self.fields,
-                    options={**self.options, **operation.options},
+                    options=new_options,
                     bases=self.bases,
                     managers=self.managers,
                 ),

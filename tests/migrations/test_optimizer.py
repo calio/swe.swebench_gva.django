@@ -119,6 +119,36 @@ class OptimizerTests(SimpleTestCase):
             ]
         )
 
+    def test_create_alter_model_options_empty(self):
+        """
+        CreateModel with options followed by AlterModelOptions with empty options
+        should result in CreateModel with empty options (options should be cleared).
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.CreateModel('Foo', fields=[], options={'verbose_name': 'Foo Model', 'verbose_name_plural': 'Foo Models'}),
+                migrations.AlterModelOptions(name='Foo', options={}),
+            ],
+            [
+                migrations.CreateModel('Foo', fields=[], options={}),
+            ]
+        )
+
+    def test_create_alter_model_options_partial(self):
+        """
+        CreateModel with options followed by AlterModelOptions with partial options
+        should result in CreateModel with only the specified options (others cleared).
+        """
+        self.assertOptimizesTo(
+            [
+                migrations.CreateModel('Foo', fields=[], options={'verbose_name': 'Foo Model', 'verbose_name_plural': 'Foo Models', 'ordering': ['id']}),
+                migrations.AlterModelOptions(name='Foo', options={'verbose_name': 'New Foo'}),
+            ],
+            [
+                migrations.CreateModel('Foo', fields=[], options={'verbose_name': 'New Foo'}),
+            ]
+        )
+
     def _test_create_alter_foo_delete_model(self, alter_foo):
         """
         CreateModel, AlterModelTable, AlterUniqueTogether/AlterIndexTogether/
