@@ -6,9 +6,9 @@ from django.test import SimpleTestCase, TestCase
 from django.test.utils import CaptureQueriesContext, isolate_apps
 
 from .models import (
-    Base, Chef, CommonInfo, GrandChild, GrandParent, ItalianRestaurant,
-    MixinModel, ParkingLot, Place, Post, Restaurant, Student, SubBase,
-    Supplier, Title, Worker,
+    Base, Chef, CommonInfo, Document, GrandChild, GrandParent, ItalianRestaurant,
+    MixinModel, ParkingLot, PickingWithCorrectOrder, PickingWithWrongOrder, Place,
+    Post, Restaurant, Student, SubBase, Supplier, Title, Worker,
 )
 
 
@@ -522,3 +522,31 @@ class InheritanceUniqueTests(TestCase):
         msg = 'Grand parent with this First name and Last name already exists.'
         with self.assertRaisesMessage(ValidationError, msg):
             grand_child.validate_unique()
+
+    def test_multiple_onetoone_to_parent(self):
+        """
+        Test that multiple OneToOneField references to the same parent model
+        work correctly regardless of field definition order.
+        Regression test for issue where the order of fields mattered.
+        """
+        # Create Document instances
+        doc1 = Document.objects.create()
+        doc2 = Document.objects.create()
+
+        # Test PickingWithWrongOrder - parent_link field is defined after origin
+        picking_wrong = PickingWithWrongOrder.objects.create(
+            document_ptr=doc1,
+            origin=doc2
+        )
+        self.assertEqual(picking_wrong.document_ptr, doc1)
+        self.assertEqual(picking_wrong.origin, doc2)
+        self.assertEqual(picking_wrong.pk, doc1.pk)
+
+        # Test PickingWithCorrectOrder - parent_link field is defined before origin
+        picking_correct = PickingWithCorrectOrder.objects.create(
+            document_ptr=doc1,
+            origin=doc2
+        )
+        self.assertEqual(picking_correct.document_ptr, doc1)
+        self.assertEqual(picking_correct.origin, doc2)
+        self.assertEqual(picking_correct.pk, doc1.pk)

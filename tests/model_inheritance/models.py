@@ -194,3 +194,47 @@ class Child(Parent):
 
 class GrandChild(Child):
     pass
+
+
+#
+# Multi-table inheritance with multiple OneToOne references to parent
+#
+
+class Document(models.Model):
+    pass
+
+
+class PickingWithWrongOrder(Document):
+    """
+    This model has the parent_link field after another OneToOneField to the parent.
+    This should fail with ImproperlyConfigured error.
+    """
+    document_ptr = models.OneToOneField(
+        Document,
+        on_delete=models.CASCADE,
+        parent_link=True,
+        related_name='+'
+    )
+    origin = models.OneToOneField(
+        Document,
+        related_name='picking_wrong_order',
+        on_delete=models.PROTECT
+    )
+
+
+class PickingWithCorrectOrder(Document):
+    """
+    This model has the parent_link field before other OneToOneFields to the parent.
+    This should work correctly.
+    """
+    origin = models.OneToOneField(
+        Document,
+        related_name='picking_correct_order',
+        on_delete=models.PROTECT
+    )
+    document_ptr = models.OneToOneField(
+        Document,
+        on_delete=models.CASCADE,
+        parent_link=True,
+        related_name='+'
+    )
