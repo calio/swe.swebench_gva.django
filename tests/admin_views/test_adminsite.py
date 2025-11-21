@@ -108,3 +108,73 @@ class SiteActionsTests(SimpleTestCase):
         self.assertEqual(self.site.get_action(action_name), delete_selected)
         self.site.disable_action(action_name)
         self.assertEqual(self.site.get_action(action_name), delete_selected)
+
+
+@override_settings(ROOT_URLCONF="admin_views.test_adminsite", APPEND_SLASH=True)
+class CatchAllViewTests(TestCase):
+    """
+    Tests for AdminSite.catch_all_view() query string preservation.
+    """
+
+    request_factory = RequestFactory()
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.u1 = User.objects.create_superuser(
+            username="super", password="secret", email="super@example.com"
+        )
+
+    def test_catch_all_view_preserves_query_string(self):
+        """
+        Test that catch_all_view() preserves query strings when redirecting
+        with APPEND_SLASH=True.
+        """
+        request = self.request_factory.get(
+            "/test_admin/admin/auth/user?id=123", SCRIPT_NAME=""
+        )
+        request.user = self.u1
+        response = site.catch_all_view(request, "auth/user")
+        # Should redirect to /test_admin/admin/auth/user/?id=123
+        self.assertEqual(response.status_code, 301)
+        self.assertIn("?id=123", response.url)
+        self.assertTrue(response.url.endswith("/?id=123"))
+
+    def test_catch_all_view_preserves_multiple_query_params(self):
+        """
+        Test that catch_all_view() preserves multiple query parameters.
+        """
+        request = self.request_factory.get(
+            "/test_admin/admin/auth/user?id=123&name=test", SCRIPT_NAME=""
+        )
+        request.user = self.u1
+        response = site.catch_all_view(request, "auth/user")
+        self.assertEqual(response.status_code, 301)
+        self.assertIn("?id=123&name=test", response.url)
+        self.assertTrue(response.url.endswith("/?id=123&name=test"))
+
+    def test_catch_all_view_without_query_string(self):
+        """
+        Test that catch_all_view() still works correctly without query strings.
+        """
+        request = self.request_factory.get(
+            "/test_admin/admin/auth/user", SCRIPT_NAME=""
+        )
+        request.user = self.u1
+        response = site.catch_all_view(request, "auth/user")
+        self.assertEqual(response.status_code, 301)
+        self.assertTrue(response.url.endswith("/"))
+        self.assertNotIn("?", response.url)
+
+    def test_catch_all_view_preserves_query_string_with_script_name(self):
+        """
+        Test that catch_all_view() preserves query strings and respects SCRIPT_NAME.
+        """
+        request = self.request_factory.get(
+            "/test_admin/admin/auth/user?id=123", SCRIPT_NAME="/my-script-name"
+        )
+        request.user = self.u1
+        response = site.catch_all_view(request, "auth/user")
+        self.assertEqual(response.status_code, 301)
+        # The redirect should include the query string
+        self.assertIn("?id=123", response.url)
+        self.assertTrue(response.url.endswith("/?id=123"))

@@ -453,7 +453,15 @@ class AdminSite:
                 pass
             else:
                 if getattr(match.func, "should_append_slash", True):
-                    return HttpResponsePermanentRedirect("%s/" % request.path)
+                    # Preserve query string when redirecting
+                    full_path = request.get_full_path()
+                    # Insert trailing slash before query string
+                    if "?" in full_path:
+                        path, query_string = full_path.split("?", 1)
+                        redirect_url = "%s/?%s" % (path, query_string)
+                    else:
+                        redirect_url = "%s/" % request.path
+                    return HttpResponsePermanentRedirect(redirect_url)
         raise Http404
 
     def _build_app_dict(self, request, label=None):
