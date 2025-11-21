@@ -1124,11 +1124,16 @@ class Query(BaseExpression):
 
     def check_filterable(self, expression):
         """Raise an error if expression cannot be used in a WHERE clause."""
-        if not getattr(expression, 'filterable', True):
-            raise NotSupportedError(
-                expression.__class__.__name__ + ' is disallowed in the filter '
-                'clause.'
-            )
+        # Only check filterable attribute on Expression objects, not on model instances
+        # or other values. Model instances may have a 'filterable' field attribute
+        # which should not be confused with the expression's filterable attribute.
+        from django.db.models.expressions import BaseExpression
+        if isinstance(expression, BaseExpression):
+            if not getattr(expression, 'filterable', True):
+                raise NotSupportedError(
+                    expression.__class__.__name__ + ' is disallowed in the filter '
+                    'clause.'
+                )
         if hasattr(expression, 'get_source_expressions'):
             for expr in expression.get_source_expressions():
                 self.check_filterable(expr)

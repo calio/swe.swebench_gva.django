@@ -878,3 +878,31 @@ class NonQueryWindowTests(SimpleTestCase):
         msg = "Expression 'Upper' isn't compatible with OVER clauses."
         with self.assertRaisesMessage(ValueError, msg):
             Window(expression=Upper('name'))
+
+
+@skipUnlessDBFeature('supports_over_clause')
+class FilterableFieldTests(TestCase):
+    """Test that models with a 'filterable' field can be used in filters."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from .models import FilterableModel, RelatedModel
+        cls.filterable_obj = FilterableModel.objects.create(name='test', filterable=False)
+        RelatedModel.objects.create(value='value1', filterable_ref=cls.filterable_obj)
+
+    def test_filter_with_model_having_filterable_field(self):
+        """Test that filtering with a model instance having filterable=False works."""
+        from .models import RelatedModel, FilterableModel
+        filterable_obj = FilterableModel.objects.get(name='test')
+        # This should not raise NotSupportedError
+        qs = RelatedModel.objects.filter(filterable_ref=filterable_obj)
+        self.assertEqual(qs.count(), 1)
+
+    def test_filter_with_model_having_filterable_true(self):
+        """Test that filtering with a model instance having filterable=True works."""
+        from .models import FilterableModel, RelatedModel
+        filterable_obj = FilterableModel.objects.create(name='test2', filterable=True)
+        RelatedModel.objects.create(value='value2', filterable_ref=filterable_obj)
+        # This should not raise NotSupportedError
+        qs = RelatedModel.objects.filter(filterable_ref=filterable_obj)
+        self.assertEqual(qs.count(), 1)

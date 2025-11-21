@@ -1,0 +1,82 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index ce18098fd2..82fd003a6d 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1124,11 +1124,16 @@ class Query(BaseExpression):
+ 
+     def check_filterable(self, expression):
+         """Raise an error if expression cannot be used in a WHERE clause."""
+-        if not getattr(expression, 'filterable', True):
+-            raise NotSupportedError(
+-                expression.__class__.__name__ + ' is disallowed in the filter '
+-                'clause.'
+-            )
++        # Only check filterable attribute on Expression objects, not on model instances
++        # or other values. Model instances may have a 'filterable' field attribute
++        # which should not be confused with the expression's filterable attribute.
++        from django.db.models.expressions import BaseExpression
++        if isinstance(expression, BaseExpression):
++            if not getattr(expression, 'filterable', True):
++                raise NotSupportedError(
++                    expression.__class__.__name__ + ' is disallowed in the filter '
++                    'clause.'
++                )
+         if hasattr(expression, 'get_source_expressions'):
+             for expr in expression.get_source_expressions():
+                 self.check_filterable(expr)
+diff --git a/tests/expressions_window/models.py b/tests/expressions_window/models.py
+index ce6f6621e9..98eafe1dd9 100644
+--- a/tests/expressions_window/models.py
++++ b/tests/expressions_window/models.py
+@@ -12,3 +12,15 @@ class Employee(models.Model):
+     hire_date = models.DateField(blank=False, null=False)
+     age = models.IntegerField(blank=False, null=False)
+     classification = models.ForeignKey('Classification', on_delete=models.CASCADE, null=True)
++
++
++class FilterableModel(models.Model):
++    """Model with a 'filterable' field to test the check_filterable bug."""
++    name = models.CharField(max_length=40)
++    filterable = models.BooleanField(default=False)
++
++
++class RelatedModel(models.Model):
++    """Model that references FilterableModel."""
++    value = models.CharField(max_length=100)
++    filterable_ref = models.ForeignKey('FilterableModel', on_delete=models.CASCADE)
+diff --git a/tests/expressions_window/tests.py b/tests/expressions_window/tests.py
+index 30ed64f529..564400dacb 100644
+--- a/tests/expressions_window/tests.py
++++ b/tests/expressions_window/tests.py
+@@ -878,3 +878,31 @@ class NonQueryWindowTests(SimpleTestCase):
+         msg = "Expression 'Upper' isn't compatible with OVER clauses."
+         with self.assertRaisesMessage(ValueError, msg):
+             Window(expression=Upper('name'))
++
++
++@skipUnlessDBFeature('supports_over_clause')
++class FilterableFieldTests(TestCase):
++    """Test that models with a 'filterable' field can be used in filters."""
++
++    @classmethod
++    def setUpTestData(cls):
++        from .models import FilterableModel, RelatedModel
++        cls.filterable_obj = FilterableModel.objects.create(name='test', filterable=False)
++        RelatedModel.objects.create(value='value1', filterable_ref=cls.filterable_obj)
++
++    def test_filter_with_model_having_filterable_field(self):
++        """Test that filtering with a model instance having filterable=False works."""
++        from .models import RelatedModel, FilterableModel
++        filterable_obj = FilterableModel.objects.get(name='test')
++        # This should not raise NotSupportedError
++        qs = RelatedModel.objects.filter(filterable_ref=filterable_obj)
++        self.assertEqual(qs.count(), 1)
++
++    def test_filter_with_model_having_filterable_true(self):
++        """Test that filtering with a model instance having filterable=True works."""
++        from .models import FilterableModel, RelatedModel
++        filterable_obj = FilterableModel.objects.create(name='test2', filterable=True)
++        RelatedModel.objects.create(value='value2', filterable_ref=filterable_obj)
++        # This should not raise NotSupportedError
++        qs = RelatedModel.objects.filter(filterable_ref=filterable_obj)
++        self.assertEqual(qs.count(), 1)
