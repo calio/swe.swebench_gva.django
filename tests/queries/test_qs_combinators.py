@@ -124,6 +124,42 @@ class QuerySetSetOperationTests(TestCase):
         reserved_name = qs1.union(qs1).values_list('name', 'order', 'id').get()
         self.assertEqual(reserved_name[:2], ('a', 2))
 
+    def test_union_with_values_list_multiple_calls(self):
+        """Test that values_list() can change columns on composed queries."""
+        ReservedName.objects.create(name='a', order=2)
+        qs1 = ReservedName.objects.all()
+        # First call with two columns
+        result1 = qs1.union(qs1).values_list('name', 'order').get()
+        self.assertEqual(result1, ('a', 2))
+        # Second call with one column - should only return 'order'
+        result2 = qs1.union(qs1).values_list('order').get()
+        self.assertEqual(result2, (2,))
+
+    @skipUnlessDBFeature('supports_select_intersection')
+    def test_intersection_with_values_list_multiple_calls(self):
+        """Test that values_list() can change columns on intersection queries."""
+        ReservedName.objects.create(name='a', order=2)
+        qs1 = ReservedName.objects.all()
+        # First call with two columns
+        result1 = qs1.intersection(qs1).values_list('name', 'order').get()
+        self.assertEqual(result1, ('a', 2))
+        # Second call with one column - should only return 'order'
+        result2 = qs1.intersection(qs1).values_list('order').get()
+        self.assertEqual(result2, (2,))
+
+    @skipUnlessDBFeature('supports_select_difference')
+    def test_difference_with_values_list_multiple_calls(self):
+        """Test that values_list() can change columns on difference queries."""
+        ReservedName.objects.create(name='a', order=2)
+        qs1 = ReservedName.objects.all()
+        qs2 = ReservedName.objects.none()
+        # First call with two columns
+        result1 = qs1.difference(qs2).values_list('name', 'order').get()
+        self.assertEqual(result1, ('a', 2))
+        # Second call with one column - should only return 'order'
+        result2 = qs1.difference(qs2).values_list('order').get()
+        self.assertEqual(result2, (2,))
+
     def test_union_with_two_annotated_values_list(self):
         qs1 = Number.objects.filter(num=1).annotate(
             count=Value(0, IntegerField()),

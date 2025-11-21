@@ -425,12 +425,22 @@ class SQLCompiler:
                 # If the columns list is limited, then all combined queries
                 # must have the same columns list. Set the selects defined on
                 # the query on all combined queries, if not already set.
-                if not compiler.query.values_select and self.query.values_select:
-                    compiler.query.set_values((
+                if self.query.values_select:
+                    # Check if the combined query's values_select differs from what
+                    # we want to set. This handles the case where values_list() is
+                    # called multiple times with different columns on the same
+                    # composed query instance (combined_queries are shared).
+                    combined_values_select = (
                         *self.query.extra_select,
                         *self.query.values_select,
                         *self.query.annotation_select,
-                    ))
+                    )
+                    if compiler.query.values_select != combined_values_select:
+                        # Only set values if the combined query has the same model
+                        # as the composed query, or if it doesn't have values_select
+                        # set yet (to avoid FieldError when combining different models).
+                        if not compiler.query.values_select or compiler.query.model == self.query.model:
+                            compiler.query.set_values(combined_values_select)
                 part_sql, part_args = compiler.as_sql()
                 if compiler.query.combinator:
                     # Wrap in a subquery if wrapping in parentheses isn't
