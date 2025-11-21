@@ -755,10 +755,10 @@ class SessionMiddlewareTests(TestCase):
 
         # The cookie was deleted, not recreated.
         # A deleted cookie header looks like:
-        #  Set-Cookie: sessionid=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/
+        #  Set-Cookie: sessionid=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/; SameSite=Lax
         self.assertEqual(
             'Set-Cookie: {}=""; expires=Thu, 01 Jan 1970 00:00:00 GMT; '
-            'Max-Age=0; Path=/'.format(
+            'Max-Age=0; Path=/; SameSite=Lax'.format(
                 settings.SESSION_COOKIE_NAME,
             ),
             str(response.cookies[settings.SESSION_COOKIE_NAME])
@@ -786,10 +786,10 @@ class SessionMiddlewareTests(TestCase):
         # A deleted cookie header with a custom domain and path looks like:
         #  Set-Cookie: sessionid=; Domain=.example.local;
         #              expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0;
-        #              Path=/example/
+        #              Path=/example/; SameSite=Lax
         self.assertEqual(
             'Set-Cookie: {}=""; Domain=.example.local; expires=Thu, '
-            '01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/example/'.format(
+            '01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/example/; SameSite=Lax'.format(
                 settings.SESSION_COOKIE_NAME,
             ),
             str(response.cookies[settings.SESSION_COOKIE_NAME])

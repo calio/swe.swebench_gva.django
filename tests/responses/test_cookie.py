@@ -118,3 +118,13 @@ class DeleteCookieTests(SimpleTestCase):
                 cookie_name = '__%s-c' % prefix
                 response.delete_cookie(cookie_name)
                 self.assertIs(response.cookies[cookie_name]['secure'], True)
+
+    def test_delete_cookie_with_samesite(self):
+        """delete_cookie() preserves the SameSite attribute."""
+        response = HttpResponse()
+        response.delete_cookie('c', samesite='Lax')
+        self.assertEqual(response.cookies['c']['samesite'], 'Lax')
+        response.delete_cookie('c', samesite='Strict')
+        self.assertEqual(response.cookies['c']['samesite'], 'Strict')
+        response.delete_cookie('c', samesite='None')
+        self.assertEqual(response.cookies['c']['samesite'], 'None')
