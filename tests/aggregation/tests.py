@@ -1315,3 +1315,35 @@ class AggregateTestCase(TestCase):
         # with self.assertNumQueries(1) as ctx:
         #     self.assertSequenceEqual(books_qs, [book])
         # self.assertEqual(ctx[0]['sql'].count('SELECT'), 2)
+
+    def test_order_by_random_with_aggregation(self):
+        """
+        Test that order_by('?') doesn't break aggregation.
+        Regression test for issue where order_by('?') would incorrectly
+        include RANDOM() in the GROUP BY clause, breaking aggregation.
+        """
+        from django.db.models.functions import Random
+        
+        # Test that order_by('?') with aggregation works correctly
+        # The aggregation should not be broken by the random ordering
+        qs = Author.objects.annotate(book_count=Count('book_contact_set')).order_by('?')
+        results = list(qs.values('id', 'book_count'))
+        
+        # Should have 9 authors (from setUpTestData)
+        self.assertEqual(len(results), 9)
+        # Each author should have a single book_count value (not duplicated)
+        for result in results:
+            self.assertIsInstance(result['book_count'], int)
+        
+        # Also test with Random() function
+        qs_random = Author.objects.annotate(
+            book_count=Count('book_contact_set'),
+            random_val=Random()
+        ).order_by('random_val')
+        results_random = list(qs_random.values('id', 'book_count'))
+        
+        # Should have 9 authors (from setUpTestData)
+        self.assertEqual(len(results_random), 9)
+        # Each author should have a single book_count value (not duplicated)
+        for result in results_random:
+            self.assertIsInstance(result['book_count'], int)
