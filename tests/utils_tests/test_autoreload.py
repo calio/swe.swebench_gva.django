@@ -217,6 +217,19 @@ class TestChildArguments(SimpleTestCase):
 
     @mock.patch('__main__.__spec__', None)
     @mock.patch('sys.warnoptions', [])
+    def test_exe_fallback_with_xoptions(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            exe_path = Path(tmpdir) / 'django-admin.exe'
+            exe_path.touch()
+            with mock.patch('sys.argv', [exe_path.with_suffix(''), 'runserver']):
+                with mock.patch('sys._xoptions', {'utf8': True}):
+                    self.assertEqual(
+                        autoreload.get_child_arguments(),
+                        [exe_path, '-Xutf8', 'runserver']
+                    )
+
+    @mock.patch('__main__.__spec__', None)
+    @mock.patch('sys.warnoptions', [])
     def test_entrypoint_fallback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             script_path = Path(tmpdir) / 'django-admin-script.py'
@@ -244,6 +257,49 @@ class TestChildArguments(SimpleTestCase):
             self.assertEqual(
                 autoreload.get_child_arguments(),
                 [sys.executable, __file__, 'runserver']
+            )
+
+    @mock.patch('__main__.__spec__', None)
+    @mock.patch('sys.argv', [__file__, 'runserver'])
+    @mock.patch('sys.warnoptions', [])
+    def test_xoptions_single(self):
+        with mock.patch('sys._xoptions', {'utf8': True}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-Xutf8', __file__, 'runserver']
+            )
+
+    @mock.patch('__main__.__spec__', None)
+    @mock.patch('sys.argv', [__file__, 'runserver'])
+    @mock.patch('sys.warnoptions', [])
+    def test_xoptions_with_value(self):
+        with mock.patch('sys._xoptions', {'utf8': '0'}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-Xutf8=0', __file__, 'runserver']
+            )
+
+    @mock.patch('__main__.__spec__', None)
+    @mock.patch('sys.argv', [__file__, 'runserver'])
+    @mock.patch('sys.warnoptions', [])
+    def test_xoptions_multiple(self):
+        with mock.patch('sys._xoptions', {'utf8': True, 'dev': True}):
+            args = autoreload.get_child_arguments()
+            # Check that both options are present (order may vary due to dict)
+            self.assertIn(sys.executable, args)
+            self.assertIn('-Xutf8', args)
+            self.assertIn('-Xdev', args)
+            self.assertIn(__file__, args)
+            self.assertIn('runserver', args)
+
+    @mock.patch('__main__.__spec__', None)
+    @mock.patch('sys.argv', [__file__, 'runserver'])
+    @mock.patch('sys.warnoptions', ['error'])
+    def test_xoptions_with_warnoptions(self):
+        with mock.patch('sys._xoptions', {'utf8': True}):
+            self.assertEqual(
+                autoreload.get_child_arguments(),
+                [sys.executable, '-Werror', '-Xutf8', __file__, 'runserver']
             )
 
 

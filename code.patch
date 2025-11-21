@@ -1,0 +1,102 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index cc65c043ab..c03e240531 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -219,7 +219,12 @@ def get_child_arguments():
+     import __main__
+     py_script = Path(sys.argv[0])
+ 
+-    args = [sys.executable] + ['-W%s' % o for o in sys.warnoptions]
++    args = [sys.executable]
++    # Add warning options
++    args += ['-W%s' % o for o in sys.warnoptions]
++    # Add implementation-specific options (e.g., -X utf8)
++    args += ['-X%s%s' % (key, '=%s' % value if value is not True else '')
++             for key, value in sys._xoptions.items()]
+     # __spec__ is set when the server was started with the `-m` option,
+     # see https://docs.python.org/3/reference/import.html#main-spec
+     # __spec__ may not exist, e.g. when running in a Conda env.
+@@ -237,7 +242,8 @@ def get_child_arguments():
+         exe_entrypoint = py_script.with_suffix('.exe')
+         if exe_entrypoint.exists():
+             # Should be executed directly, ignoring sys.executable.
+-            return [exe_entrypoint, *sys.argv[1:]]
++            # But we still need to include the -W and -X options.
++            return [exe_entrypoint] + args[1:] + sys.argv[1:]
+         script_entrypoint = py_script.with_name('%s-script.py' % py_script.name)
+         if script_entrypoint.exists():
+             # Should be executed as usual.
+diff --git a/tests/utils_tests/test_autoreload.py b/tests/utils_tests/test_autoreload.py
+index 7c28a9d4d0..b71340fb68 100644
+--- a/tests/utils_tests/test_autoreload.py
++++ b/tests/utils_tests/test_autoreload.py
+@@ -215,6 +215,19 @@ class TestChildArguments(SimpleTestCase):
+                     [exe_path, 'runserver']
+                 )
+ 
++    @mock.patch('__main__.__spec__', None)
++    @mock.patch('sys.warnoptions', [])
++    def test_exe_fallback_with_xoptions(self):
++        with tempfile.TemporaryDirectory() as tmpdir:
++            exe_path = Path(tmpdir) / 'django-admin.exe'
++            exe_path.touch()
++            with mock.patch('sys.argv', [exe_path.with_suffix(''), 'runserver']):
++                with mock.patch('sys._xoptions', {'utf8': True}):
++                    self.assertEqual(
++                        autoreload.get_child_arguments(),
++                        [exe_path, '-Xutf8', 'runserver']
++                    )
++
+     @mock.patch('__main__.__spec__', None)
+     @mock.patch('sys.warnoptions', [])
+     def test_entrypoint_fallback(self):
+@@ -246,6 +259,49 @@ class TestChildArguments(SimpleTestCase):
+                 [sys.executable, __file__, 'runserver']
+             )
+ 
++    @mock.patch('__main__.__spec__', None)
++    @mock.patch('sys.argv', [__file__, 'runserver'])
++    @mock.patch('sys.warnoptions', [])
++    def test_xoptions_single(self):
++        with mock.patch('sys._xoptions', {'utf8': True}):
++            self.assertEqual(
++                autoreload.get_child_arguments(),
++                [sys.executable, '-Xutf8', __file__, 'runserver']
++            )
++
++    @mock.patch('__main__.__spec__', None)
++    @mock.patch('sys.argv', [__file__, 'runserver'])
++    @mock.patch('sys.warnoptions', [])
++    def test_xoptions_with_value(self):
++        with mock.patch('sys._xoptions', {'utf8': '0'}):
++            self.assertEqual(
++                autoreload.get_child_arguments(),
++                [sys.executable, '-Xutf8=0', __file__, 'runserver']
++            )
++
++    @mock.patch('__main__.__spec__', None)
++    @mock.patch('sys.argv', [__file__, 'runserver'])
++    @mock.patch('sys.warnoptions', [])
++    def test_xoptions_multiple(self):
++        with mock.patch('sys._xoptions', {'utf8': True, 'dev': True}):
++            args = autoreload.get_child_arguments()
++            # Check that both options are present (order may vary due to dict)
++            self.assertIn(sys.executable, args)
++            self.assertIn('-Xutf8', args)
++            self.assertIn('-Xdev', args)
++            self.assertIn(__file__, args)
++            self.assertIn('runserver', args)
++
++    @mock.patch('__main__.__spec__', None)
++    @mock.patch('sys.argv', [__file__, 'runserver'])
++    @mock.patch('sys.warnoptions', ['error'])
++    def test_xoptions_with_warnoptions(self):
++        with mock.patch('sys._xoptions', {'utf8': True}):
++            self.assertEqual(
++                autoreload.get_child_arguments(),
++                [sys.executable, '-Werror', '-Xutf8', __file__, 'runserver']
++            )
++
+ 
+ class TestUtilities(SimpleTestCase):
+     def test_is_django_module(self):

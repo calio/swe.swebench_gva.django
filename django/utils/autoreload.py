@@ -219,7 +219,12 @@ def get_child_arguments():
     import __main__
     py_script = Path(sys.argv[0])
 
-    args = [sys.executable] + ['-W%s' % o for o in sys.warnoptions]
+    args = [sys.executable]
+    # Add warning options
+    args += ['-W%s' % o for o in sys.warnoptions]
+    # Add implementation-specific options (e.g., -X utf8)
+    args += ['-X%s%s' % (key, '=%s' % value if value is not True else '')
+             for key, value in sys._xoptions.items()]
     # __spec__ is set when the server was started with the `-m` option,
     # see https://docs.python.org/3/reference/import.html#main-spec
     # __spec__ may not exist, e.g. when running in a Conda env.
@@ -237,7 +242,8 @@ def get_child_arguments():
         exe_entrypoint = py_script.with_suffix('.exe')
         if exe_entrypoint.exists():
             # Should be executed directly, ignoring sys.executable.
-            return [exe_entrypoint, *sys.argv[1:]]
+            # But we still need to include the -W and -X options.
+            return [exe_entrypoint] + args[1:] + sys.argv[1:]
         script_entrypoint = py_script.with_name('%s-script.py' % py_script.name)
         if script_entrypoint.exists():
             # Should be executed as usual.
