@@ -27,10 +27,20 @@ def deconstructible(*args, path=None):
                 module_name, _, name = path.rpartition('.')
             else:
                 module_name = obj.__module__
-                name = obj.__class__.__name__
+                name = obj.__class__.__qualname__
             # Make sure it's actually there and not an inner class
             module = import_module(module_name)
-            if not hasattr(module, name):
+            # Check if the name contains <locals>, which indicates a local class
+            if '<locals>' in name:
+                raise ValueError(
+                    "Could not find object %s in %s.\n"
+                    "Please note that you cannot serialize things like inner "
+                    "classes. Please move the object into the main module "
+                    "body to use migrations.\n"
+                    "For more information, see "
+                    "https://docs.djangoproject.com/en/%s/topics/migrations/#serializing-values"
+                    % (name, module_name, get_docs_version()))
+            if not hasattr(module, name.split('.')[0]):
                 raise ValueError(
                     "Could not find object %s in %s.\n"
                     "Please note that you cannot serialize things like inner "

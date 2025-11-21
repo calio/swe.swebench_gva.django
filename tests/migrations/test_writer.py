@@ -61,6 +61,11 @@ class IntEnum(enum.IntEnum):
     B = 2
 
 
+class OuterClass:
+    class InnerField(models.CharField):
+        pass
+
+
 class OperationWriterTests(SimpleTestCase):
 
     def test_empty_signature(self):
@@ -747,3 +752,15 @@ class WriterTests(SimpleTestCase):
     def test_register_non_serializer(self):
         with self.assertRaisesMessage(ValueError, "'TestModel1' must inherit from 'BaseSerializer'."):
             MigrationWriter.register_serializer(complex, TestModel1)
+
+    def test_serialize_nested_field_class(self):
+        """
+        Test that nested Field classes are serialized with their full qualified name.
+        Regression test for issue where inner classes were serialized without the outer class name.
+        """
+        field = OuterClass.InnerField(max_length=20)
+        string, imports = MigrationWriter.serialize(field)
+        # The serialized string should include the outer class name
+        self.assertIn('OuterClass.InnerField', string)
+        self.assertEqual(string, 'migrations.test_writer.OuterClass.InnerField(max_length=20)')
+        self.assertEqual(imports, {'import migrations.test_writer'})

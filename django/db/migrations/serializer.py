@@ -90,13 +90,50 @@ class DeconstructableSerializer(BaseSerializer):
 
     @staticmethod
     def _serialize_path(path):
+        from importlib import import_module
+        
         module, name = path.rsplit(".", 1)
         if module == "django.db.models":
             imports = {"from django.db import models"}
             name = "models.%s" % name
         else:
-            imports = {"import %s" % module}
-            name = path
+            # Try to import the module. If it fails, it might be a nested class,
+            # so we need to find the actual module by working backwards.
+            try:
+                import_module(module)
+                imports = {"import %s" % module}
+                name = path
+            except ImportError:
+                # The module doesn't exist, so it's likely a nested class.
+                # Work backwards to find the actual module.
+                parts = module.split(".")
+                actual_module = None
+                for i in range(len(parts), 0, -1):
+                    try:
+                        import_module(".".join(parts[:i]))
+                        actual_module = ".".join(parts[:i])
+                        break
+                    except ImportError:
+                        continue
+                
+                if actual_module:
+                    imports = {"import %s" % actual_module}
+                    # Reconstruct the full path with the class hierarchy
+                    # e.g., for "migrations.test_writer.OuterClass.InnerField",
+                    # if actual_module is "migrations.test_writer", then
+                    # class_parts will be ["OuterClass"] and name will be "InnerField"
+                    # so the full path will be "migrations.test_writer.OuterClass.InnerField"
+                    actual_module_parts = actual_module.split(".")
+                    class_parts = parts[len(actual_module_parts):]
+                    if class_parts:
+                        class_path = ".".join(class_parts + [name])
+                        name = "%s.%s" % (actual_module, class_path)
+                    else:
+                        name = path
+                else:
+                    # Fallback to the original behavior
+                    imports = {"import %s" % module}
+                    name = path
         return name, imports
 
     def serialize(self):
@@ -143,7 +180,7 @@ class FunctionTypeSerializer(BaseSerializer):
         if getattr(self.value, "__self__", None) and isinstance(self.value.__self__, type):
             klass = self.value.__self__
             module = klass.__module__
-            return "%s.%s.%s" % (module, klass.__name__, self.value.__name__), {"import %s" % module}
+            return "%s.%s.%s" % (module, klass.__qualname__, self.value.__name__), {"import %s" % module}
         # Further error checking
         if self.value.__name__ == '<lambda>':
             raise ValueError("Cannot serialize function: lambda")
@@ -267,9 +304,14 @@ class TypeSerializer(BaseSerializer):
         if hasattr(self.value, "__module__"):
             module = self.value.__module__
             if module == builtins.__name__:
-                return self.value.__name__, set()
+                return self.value.__qualname__, set()
             else:
-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
+                # Use __qualname__ for nested classes, but fall back to __name__
+                # for classes defined in local scopes (which contain '<locals>')
+                name = self.value.__qualname__
+                if '<locals>' in name:
+                    name = self.value.__name__
+                return "%s.%s" % (module, name), {"import %s" % module}
 
 
 class UUIDSerializer(BaseSerializer):
