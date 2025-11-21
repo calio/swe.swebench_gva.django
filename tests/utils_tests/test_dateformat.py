@@ -105,6 +105,15 @@ class DateFormatTests(SimpleTestCase):
         self.assertEqual(dateformat.format(my_birthday, 'Y'), '1979')
         self.assertEqual(dateformat.format(my_birthday, 'z'), '189')
 
+    def test_year_two_digit_format(self):
+        # Test for issue #13670 - dateformat.y() should pad years < 1000 with leading zeros
+        self.assertEqual(dateformat.format(datetime(9, 4, 5), 'y'), '09')
+        self.assertEqual(dateformat.format(datetime(99, 4, 5), 'y'), '99')
+        self.assertEqual(dateformat.format(datetime(123, 4, 5), 'y'), '23')
+        self.assertEqual(dateformat.format(datetime(999, 4, 5), 'y'), '99')
+        self.assertEqual(dateformat.format(datetime(1979, 4, 5), 'y'), '79')
+        self.assertEqual(dateformat.format(datetime(2009, 4, 5), 'y'), '09')
+
     def test_dateformat(self):
         my_birthday = datetime(1979, 7, 8, 22, 00)
 
