@@ -1,0 +1,135 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index ae82d26340..737decf0c0 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -1,9 +1,10 @@
+-from collections import Counter
++from collections import Counter, defaultdict
+ from itertools import chain
+ from operator import attrgetter
+ 
+ from django.db import IntegrityError, connections, transaction
+ from django.db.models import signals, sql
++from django.db.models.query_utils import Q
+ 
+ 
+ class ProtectedError(IntegrityError):
+@@ -257,6 +258,39 @@ class Collector:
+             **{"%s__in" % related.field.name: objs}
+         )
+ 
++    def _combine_fast_deletes(self):
++        """
++        Combine fast delete querysets by model to reduce the number of
++        database queries. For example, combine:
++            DELETE FROM table WHERE field1_id = :id
++            DELETE FROM table WHERE field2_id = :id
++        Into:
++            DELETE FROM table WHERE field1_id = :id OR field2_id = :id
++        """
++        # Group querysets by model
++        fast_deletes_by_model = defaultdict(list)
++        for qs in self.fast_deletes:
++            fast_deletes_by_model[qs.model].append(qs)
++
++        # Combine querysets for the same model
++        combined_fast_deletes = []
++        for model, querysets in fast_deletes_by_model.items():
++            if len(querysets) == 1:
++                # No combination needed
++                combined_fast_deletes.append(querysets[0])
++            else:
++                # Combine multiple querysets using OR
++                # Start with an empty queryset
++                combined_qs = model._base_manager.using(self.using).none()
++                
++                # Combine all querysets using OR
++                for qs in querysets:
++                    combined_qs = combined_qs | qs
++
++                combined_fast_deletes.append(combined_qs)
++
++        return combined_fast_deletes
++
+     def instances_with_model(self):
+         for model, instances in self.data.items():
+             for obj in instances:
+@@ -310,7 +344,8 @@ class Collector:
+                     )
+ 
+             # fast deletes
+-            for qs in self.fast_deletes:
++            combined_fast_deletes = self._combine_fast_deletes()
++            for qs in combined_fast_deletes:
+                 count = qs._raw_delete(using=self.using)
+                 deleted_counter[qs.model._meta.label] += count
+ 
+diff --git a/tests/delete/tests.py b/tests/delete/tests.py
+index 505fd843d7..9e8a32d736 100644
+--- a/tests/delete/tests.py
++++ b/tests/delete/tests.py
+@@ -335,9 +335,9 @@ class DeletionTests(TestCase):
+         batch_size = connection.ops.bulk_batch_size(['pk'], objs)
+         # The related fetches are done in batches.
+         batches = ceil(len(objs) / batch_size)
+-        # One query for Avatar.objects.all() and then one related fast delete for
+-        # each batch.
+-        fetches_to_mem = 1 + batches
++        # One query for Avatar.objects.all() and then one combined fast delete for
++        # all batches (fast deletes are combined by model).
++        fetches_to_mem = 1 + 1
+         # The Avatar objects are going to be deleted in batches of GET_ITERATOR_CHUNK_SIZE
+         queries = fetches_to_mem + TEST_SIZE // GET_ITERATOR_CHUNK_SIZE
+         self.assertNumQueries(queries, Avatar.objects.all().delete)
+@@ -351,12 +351,11 @@ class DeletionTests(TestCase):
+ 
+         batch_size = max(connection.ops.bulk_batch_size(['pk'], range(TEST_SIZE)), 1)
+ 
+-        # TEST_SIZE / batch_size (select related `T` instances)
+-        # + 1 (select related `U` instances)
++        # 1 (select related `T` instances)
++        # + 1 (combined fast delete for `U` instances - all batches combined into one query with OR)
+         # + TEST_SIZE / GET_ITERATOR_CHUNK_SIZE (delete `T` instances in batches)
+         # + 1 (delete `s`)
+-        expected_num_queries = ceil(TEST_SIZE / batch_size)
+-        expected_num_queries += ceil(TEST_SIZE / GET_ITERATOR_CHUNK_SIZE) + 2
++        expected_num_queries = 1 + 1 + ceil(TEST_SIZE / GET_ITERATOR_CHUNK_SIZE) + 1
+ 
+         self.assertNumQueries(expected_num_queries, s.delete)
+         self.assertFalse(S.objects.exists())
+@@ -582,3 +581,35 @@ class FastDeleteTests(TestCase):
+                 User.objects.filter(avatar__desc='missing').delete(),
+                 (0, {'delete.User': 0})
+             )
++
++    def test_fast_delete_combined_queries(self):
++        """
++        Test that fast delete queries are combined by model to reduce
++        database roundtrips. When deleting a model with multiple foreign
++        keys to the same table, the DELETE queries should be combined
++        using OR instead of executed separately.
++        """
++        # Create test data: A with multiple foreign keys to R
++        r = R.objects.create()
++        a = A.objects.create(
++            name='test',
++            auto=r,
++            auto_nullable=r,
++            setvalue=r,
++            setnull=r,
++            setdefault=r,
++            setdefault_none=r,
++            cascade=r,
++            cascade_nullable=r,
++            protect=r,
++            donothing=r,
++            child=RChild.objects.create(),
++            child_setnull=RChild.objects.create(),
++            o2o_setnull=r,
++        )
++
++        # When deleting A, the related objects should be deleted efficiently
++        # The key is that fast deletes are combined by model
++        a.delete()
++
++        self.assertFalse(A.objects.exists())

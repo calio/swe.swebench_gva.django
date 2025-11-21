@@ -335,9 +335,9 @@ class DeletionTests(TestCase):
         batch_size = connection.ops.bulk_batch_size(['pk'], objs)
         # The related fetches are done in batches.
         batches = ceil(len(objs) / batch_size)
-        # One query for Avatar.objects.all() and then one related fast delete for
-        # each batch.
-        fetches_to_mem = 1 + batches
+        # One query for Avatar.objects.all() and then one combined fast delete for
+        # all batches (fast deletes are combined by model).
+        fetches_to_mem = 1 + 1
         # The Avatar objects are going to be deleted in batches of GET_ITERATOR_CHUNK_SIZE
         queries = fetches_to_mem + TEST_SIZE // GET_ITERATOR_CHUNK_SIZE
         self.assertNumQueries(queries, Avatar.objects.all().delete)
@@ -351,12 +351,11 @@ class DeletionTests(TestCase):
 
         batch_size = max(connection.ops.bulk_batch_size(['pk'], range(TEST_SIZE)), 1)
 
-        # TEST_SIZE / batch_size (select related `T` instances)
-        # + 1 (select related `U` instances)
+        # 1 (select related `T` instances)
+        # + 1 (combined fast delete for `U` instances - all batches combined into one query with OR)
         # + TEST_SIZE / GET_ITERATOR_CHUNK_SIZE (delete `T` instances in batches)
         # + 1 (delete `s`)
-        expected_num_queries = ceil(TEST_SIZE / batch_size)
-        expected_num_queries += ceil(TEST_SIZE / GET_ITERATOR_CHUNK_SIZE) + 2
+        expected_num_queries = 1 + 1 + ceil(TEST_SIZE / GET_ITERATOR_CHUNK_SIZE) + 1
 
         self.assertNumQueries(expected_num_queries, s.delete)
         self.assertFalse(S.objects.exists())
@@ -582,3 +581,35 @@ class FastDeleteTests(TestCase):
                 User.objects.filter(avatar__desc='missing').delete(),
                 (0, {'delete.User': 0})
             )
+
+    def test_fast_delete_combined_queries(self):
+        """
+        Test that fast delete queries are combined by model to reduce
+        database roundtrips. When deleting a model with multiple foreign
+        keys to the same table, the DELETE queries should be combined
+        using OR instead of executed separately.
+        """
+        # Create test data: A with multiple foreign keys to R
+        r = R.objects.create()
+        a = A.objects.create(
+            name='test',
+            auto=r,
+            auto_nullable=r,
+            setvalue=r,
+            setnull=r,
+            setdefault=r,
+            setdefault_none=r,
+            cascade=r,
+            cascade_nullable=r,
+            protect=r,
+            donothing=r,
+            child=RChild.objects.create(),
+            child_setnull=RChild.objects.create(),
+            o2o_setnull=r,
+        )
+
+        # When deleting A, the related objects should be deleted efficiently
+        # The key is that fast deletes are combined by model
+        a.delete()
+
+        self.assertFalse(A.objects.exists())

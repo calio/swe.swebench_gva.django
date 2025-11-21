@@ -1,9 +1,10 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from itertools import chain
 from operator import attrgetter
 
 from django.db import IntegrityError, connections, transaction
 from django.db.models import signals, sql
+from django.db.models.query_utils import Q
 
 
 class ProtectedError(IntegrityError):
@@ -257,6 +258,39 @@ class Collector:
             **{"%s__in" % related.field.name: objs}
         )
 
+    def _combine_fast_deletes(self):
+        """
+        Combine fast delete querysets by model to reduce the number of
+        database queries. For example, combine:
+            DELETE FROM table WHERE field1_id = :id
+            DELETE FROM table WHERE field2_id = :id
+        Into:
+            DELETE FROM table WHERE field1_id = :id OR field2_id = :id
+        """
+        # Group querysets by model
+        fast_deletes_by_model = defaultdict(list)
+        for qs in self.fast_deletes:
+            fast_deletes_by_model[qs.model].append(qs)
+
+        # Combine querysets for the same model
+        combined_fast_deletes = []
+        for model, querysets in fast_deletes_by_model.items():
+            if len(querysets) == 1:
+                # No combination needed
+                combined_fast_deletes.append(querysets[0])
+            else:
+                # Combine multiple querysets using OR
+                # Start with an empty queryset
+                combined_qs = model._base_manager.using(self.using).none()
+                
+                # Combine all querysets using OR
+                for qs in querysets:
+                    combined_qs = combined_qs | qs
+
+                combined_fast_deletes.append(combined_qs)
+
+        return combined_fast_deletes
+
     def instances_with_model(self):
         for model, instances in self.data.items():
             for obj in instances:
@@ -310,7 +344,8 @@ class Collector:
                     )
 
             # fast deletes
-            for qs in self.fast_deletes:
+            combined_fast_deletes = self._combine_fast_deletes()
+            for qs in combined_fast_deletes:
                 count = qs._raw_delete(using=self.using)
                 deleted_counter[qs.model._meta.label] += count
 
