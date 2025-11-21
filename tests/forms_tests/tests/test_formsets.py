@@ -1145,6 +1145,27 @@ class FormsFormsetTestCase(SimpleTestCase):
         self.assertIsInstance(formset.non_form_errors(), ErrorList)
         self.assertEqual(list(formset.non_form_errors()), ['This is a non-form error'])
 
+    def test_non_form_errors_have_nonform_css_class(self):
+        """
+        Non-form errors should have the 'nonform' CSS class to distinguish
+        them from form field errors and non-field errors.
+        """
+        class BaseCustomFormSet(BaseFormSet):
+            def clean(self):
+                raise ValidationError("This is a non-form error")
+
+        ChoiceFormSet = formset_factory(Choice, formset=BaseCustomFormSet)
+        data = {
+            'choices-TOTAL_FORMS': '1',
+            'choices-INITIAL_FORMS': '0',
+        }
+        formset = ChoiceFormSet(data, auto_id=False, prefix='choices')
+        non_form_errors = formset.non_form_errors()
+        # Check that the error_class attribute contains 'nonform'
+        self.assertIn('nonform', non_form_errors.error_class)
+        # Check that the rendered HTML contains the nonform class
+        self.assertIn('class="errorlist nonform"', str(non_form_errors))
+
     def test_validate_max_ignores_forms_marked_for_deletion(self):
         class CheckForm(Form):
             field = IntegerField()

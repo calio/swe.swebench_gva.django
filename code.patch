@@ -1,0 +1,76 @@
+diff --git a/django/forms/formsets.py b/django/forms/formsets.py
+index a89c35599f..1b0d4554e0 100644
+--- a/django/forms/formsets.py
++++ b/django/forms/formsets.py
+@@ -333,7 +333,7 @@ class BaseFormSet:
+         self._non_form_errors.
+         """
+         self._errors = []
+-        self._non_form_errors = self.error_class()
++        self._non_form_errors = self.error_class(error_class='nonform')
+         empty_forms_count = 0
+ 
+         if not self.is_bound:  # Stop further processing.
+@@ -380,7 +380,7 @@ class BaseFormSet:
+             # Give self.clean() a chance to do cross-form validation.
+             self.clean()
+         except ValidationError as e:
+-            self._non_form_errors = self.error_class(e.error_list)
++            self._non_form_errors = self.error_class(e.error_list, error_class='nonform')
+ 
+     def clean(self):
+         """
+diff --git a/docs/topics/forms/formsets.txt b/docs/topics/forms/formsets.txt
+index 1f2c7c3fad..7ac5f7aa84 100644
+--- a/docs/topics/forms/formsets.txt
++++ b/docs/topics/forms/formsets.txt
+@@ -365,6 +365,17 @@ The formset ``clean`` method is called after all the ``Form.clean`` methods
+ have been called. The errors will be found using the ``non_form_errors()``
+ method on the formset.
+ 
++Non-form errors (and/or management form errors) will be rendered with an
++additional class of ``nonform`` to help distinguish them from form field errors
++and non-field errors. For example, ``{{ formset.non_form_errors }}`` would look
++like:
++
++.. code-block:: html+django
++
++    <ul class="errorlist nonform">
++        <li>Articles in a set must have distinct titles.</li>
++    </ul>
++
+ Validating the number of forms in a formset
+ ===========================================
+ 
+diff --git a/tests/forms_tests/tests/test_formsets.py b/tests/forms_tests/tests/test_formsets.py
+index 889560aa74..fe015cf429 100644
+--- a/tests/forms_tests/tests/test_formsets.py
++++ b/tests/forms_tests/tests/test_formsets.py
+@@ -1145,6 +1145,27 @@ class FormsFormsetTestCase(SimpleTestCase):
+         self.assertIsInstance(formset.non_form_errors(), ErrorList)
+         self.assertEqual(list(formset.non_form_errors()), ['This is a non-form error'])
+ 
++    def test_non_form_errors_have_nonform_css_class(self):
++        """
++        Non-form errors should have the 'nonform' CSS class to distinguish
++        them from form field errors and non-field errors.
++        """
++        class BaseCustomFormSet(BaseFormSet):
++            def clean(self):
++                raise ValidationError("This is a non-form error")
++
++        ChoiceFormSet = formset_factory(Choice, formset=BaseCustomFormSet)
++        data = {
++            'choices-TOTAL_FORMS': '1',
++            'choices-INITIAL_FORMS': '0',
++        }
++        formset = ChoiceFormSet(data, auto_id=False, prefix='choices')
++        non_form_errors = formset.non_form_errors()
++        # Check that the error_class attribute contains 'nonform'
++        self.assertIn('nonform', non_form_errors.error_class)
++        # Check that the rendered HTML contains the nonform class
++        self.assertIn('class="errorlist nonform"', str(non_form_errors))
++
+     def test_validate_max_ignores_forms_marked_for_deletion(self):
+         class CheckForm(Form):
+             field = IntegerField()
