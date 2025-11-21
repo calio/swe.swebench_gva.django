@@ -222,14 +222,18 @@ class ModelBase(type):
                 # on the base classes.
                 for field in parent_fields:
                     if field.name in field_names:
-                        raise FieldError(
-                            'Local field %r in class %r clashes with field of '
-                            'the same name from base class %r.' % (
-                                field.name,
-                                name,
-                                base.__name__,
+                        # Allow field overriding in migrations (indicated by __module__ == "__fake__")
+                        # This handles the case where a field is moved from parent to child model
+                        # in the same migration step.
+                        if module != "__fake__":
+                            raise FieldError(
+                                'Local field %r in class %r clashes with field of '
+                                'the same name from base class %r.' % (
+                                    field.name,
+                                    name,
+                                    base.__name__,
+                                )
                             )
-                        )
                     else:
                         inherited_attributes.add(field.name)
 

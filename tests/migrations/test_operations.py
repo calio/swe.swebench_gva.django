@@ -246,6 +246,67 @@ class OperationTests(OperationTestBase):
             operation.database_backwards("test_crmoih", editor, new_state, project_state)
         self.assertTableNotExists("test_crmoih_shetlandpony")
 
+    def test_create_model_with_field_moved_from_parent(self):
+        """
+        Tests creating a model subclass with a field that's being moved from
+        the parent model in the same migration. This should not raise a FieldError.
+        Regression test for issue where moving a field to a subclass in the same
+        migration step would fail with "Local field clashes with field of the same
+        name from base class".
+        """
+        # Create initial state with parent model having a field
+        project_state = ProjectState()
+        project_state.add_model(migrations.state.ModelState(
+            app_label='test_app',
+            name='Readable',
+            fields=[
+                ('id', models.AutoField(primary_key=True)),
+                ('title', models.CharField(max_length=200)),
+            ],
+            options={},
+            bases=(models.Model,),
+            managers=[],
+        ))
+
+        # Create the child model with the same field
+        create_book = migrations.CreateModel(
+            'Book',
+            fields=[
+                ('id', models.AutoField(primary_key=True)),
+                ('title', models.CharField(max_length=200)),
+            ],
+            bases=('test_app.Readable',),
+        )
+
+        # Apply CreateModel operation - this should not raise FieldError
+        new_state = project_state.clone()
+        create_book.state_forwards('test_app', new_state)
+
+        # Verify the models can be rendered without error
+        apps = new_state.apps
+        book_model = apps.get_model('test_app', 'Book')
+        readable_model = apps.get_model('test_app', 'Readable')
+
+        # Verify the field exists on both models
+        self.assertIn('title', [f.name for f in book_model._meta.get_fields()])
+        self.assertIn('title', [f.name for f in readable_model._meta.get_fields()])
+
+        # Now remove the field from the parent
+        remove_title = migrations.RemoveField(
+            model_name='readable',
+            name='title',
+        )
+        remove_title.state_forwards('test_app', new_state)
+
+        # Verify the models can still be rendered
+        apps = new_state.apps
+        book_model = apps.get_model('test_app', 'Book')
+        readable_model = apps.get_model('test_app', 'Readable')
+
+        # Verify the field is only on the child model now
+        self.assertIn('title', [f.name for f in book_model._meta.get_fields()])
+        self.assertNotIn('title', [f.name for f in readable_model._meta.local_fields])
+
     def test_create_proxy_model(self):
         """
         CreateModel ignores proxy models.
