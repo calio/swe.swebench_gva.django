@@ -1008,7 +1008,12 @@ class CharField(Field):
         return "CharField"
 
     def to_python(self, value):
-        if isinstance(value, str) or value is None:
+        if value is None:
+            return value
+        # Handle enum values by extracting the underlying value
+        if hasattr(value, 'value'):
+            return value.value
+        if isinstance(value, str):
             return value
         return str(value)
 
@@ -1769,6 +1774,9 @@ class IntegerField(Field):
     def to_python(self, value):
         if value is None:
             return value
+        # Handle enum values by extracting the underlying value
+        if hasattr(value, 'value'):
+            value = value.value
         try:
             return int(value)
         except (TypeError, ValueError):

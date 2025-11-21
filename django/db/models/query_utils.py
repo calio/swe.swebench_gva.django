@@ -138,6 +138,14 @@ class DeferredAttribute:
             data[field_name] = val
         return data[field_name]
 
+    def __set__(self, instance, value):
+        """
+        Assign a value to the field. Convert the value using the field's
+        to_python() method to ensure consistency with values loaded from
+        the database.
+        """
+        instance.__dict__[self.field.attname] = self.field.to_python(value)
+
     def _check_parent_chain(self, instance):
         """
         Check if the field value can be fetched from a parent field already

@@ -1,0 +1,47 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index d610dc86f0..b277b84d3e 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1008,7 +1008,12 @@ class CharField(Field):
+         return "CharField"
+ 
+     def to_python(self, value):
+-        if isinstance(value, str) or value is None:
++        if value is None:
++            return value
++        # Handle enum values by extracting the underlying value
++        if hasattr(value, 'value'):
++            return value.value
++        if isinstance(value, str):
+             return value
+         return str(value)
+ 
+@@ -1769,6 +1774,9 @@ class IntegerField(Field):
+     def to_python(self, value):
+         if value is None:
+             return value
++        # Handle enum values by extracting the underlying value
++        if hasattr(value, 'value'):
++            value = value.value
+         try:
+             return int(value)
+         except (TypeError, ValueError):
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index 189fb4fa44..4dfbbc0986 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -138,6 +138,14 @@ class DeferredAttribute:
+             data[field_name] = val
+         return data[field_name]
+ 
++    def __set__(self, instance, value):
++        """
++        Assign a value to the field. Convert the value using the field's
++        to_python() method to ensure consistency with values loaded from
++        the database.
++        """
++        instance.__dict__[self.field.attname] = self.field.to_python(value)
++
+     def _check_parent_chain(self, instance):
+         """
+         Check if the field value can be fetched from a parent field already
