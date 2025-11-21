@@ -73,7 +73,7 @@ def get_current_timezone_name():
 
 def _get_timezone_name(timezone):
     """Return the name of ``timezone``."""
-    return str(timezone)
+    return timezone.tzname(None) or str(timezone)
 
 # Timezone selection functions.
 
