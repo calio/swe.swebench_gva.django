@@ -591,6 +591,89 @@ class ListFiltersTests(TestCase):
         expected = [(self.john.pk, 'John Blue'), (self.jack.pk, 'Jack Red')]
         self.assertEqual(filterspec.lookup_choices, expected)
 
+    def test_relatedfieldlistfilter_falls_back_to_model_ordering(self):
+        """
+        RelatedFieldListFilter should fall back to the related model's
+        Meta.ordering when no ModelAdmin is registered.
+        """
+        class BookAdmin(ModelAdmin):
+            list_filter = ('employee',)
+
+        # Make sure Employee is NOT registered
+        if Employee in site._registry:
+            site.unregister(Employee)
+
+        modeladmin = BookAdmin(Book, site)
+
+        request = self.request_factory.get('/')
+        request.user = self.alfred
+        changelist = modeladmin.get_changelist_instance(request)
+        filterspec = changelist.get_filters(request)[0][0]
+        
+        # Employee model has Meta.ordering = ['name']
+        # So choices should be ordered alphabetically: Jack Red, John Blue
+        expected = [(self.jack.pk, 'Jack Red'), (self.john.pk, 'John Blue')]
+        self.assertEqual(filterspec.lookup_choices, expected)
+
+    def test_relatedonlyfieldlistfilter_ordering(self):
+        """
+        RelatedOnlyFieldListFilter should respect ModelAdmin.ordering.
+        """
+        # Assign employees to books so RelatedOnlyFieldListFilter has data
+        self.djangonaut_book.employee = self.john
+        self.djangonaut_book.save()
+        self.bio_book.employee = self.jack
+        self.bio_book.save()
+
+        class EmployeeAdminWithOrdering(ModelAdmin):
+            ordering = ('-name',)
+
+        class BookAdmin(ModelAdmin):
+            list_filter = (('employee', RelatedOnlyFieldListFilter),)
+
+        site.register(Employee, EmployeeAdminWithOrdering)
+        self.addCleanup(lambda: site.unregister(Employee))
+        modeladmin = BookAdmin(Book, site)
+
+        request = self.request_factory.get('/')
+        request.user = self.alfred
+        changelist = modeladmin.get_changelist_instance(request)
+        filterspec = changelist.get_filters(request)[0][0]
+        
+        # Should be ordered by -name: John Blue, Jack Red
+        expected = [(self.john.pk, 'John Blue'), (self.jack.pk, 'Jack Red')]
+        self.assertEqual(filterspec.lookup_choices, expected)
+
+    def test_relatedonlyfieldlistfilter_falls_back_to_model_ordering(self):
+        """
+        RelatedOnlyFieldListFilter should fall back to the related model's
+        Meta.ordering when no ModelAdmin is registered.
+        """
+        # Assign employees to books so RelatedOnlyFieldListFilter has data
+        self.djangonaut_book.employee = self.john
+        self.djangonaut_book.save()
+        self.bio_book.employee = self.jack
+        self.bio_book.save()
+
+        class BookAdmin(ModelAdmin):
+            list_filter = (('employee', RelatedOnlyFieldListFilter),)
+
+        # Make sure Employee is NOT registered
+        if Employee in site._registry:
+            site.unregister(Employee)
+
+        modeladmin = BookAdmin(Book, site)
+
+        request = self.request_factory.get('/')
+        request.user = self.alfred
+        changelist = modeladmin.get_changelist_instance(request)
+        filterspec = changelist.get_filters(request)[0][0]
+        
+        # Employee model has Meta.ordering = ['name']
+        # So choices should be ordered alphabetically: Jack Red, John Blue
+        expected = [(self.jack.pk, 'Jack Red'), (self.john.pk, 'John Blue')]
+        self.assertEqual(filterspec.lookup_choices, expected)
+
     def test_relatedfieldlistfilter_manytomany(self):
         modeladmin = BookAdmin(Book, site)
 
