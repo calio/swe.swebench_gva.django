@@ -202,12 +202,16 @@ class GenericForeignKey(FieldCacheMixin):
             else:
                 model = self.get_content_type(id=ct_id,
                                               using=obj._state.db).model_class()
-                return (model._meta.pk.get_prep_value(getattr(obj, self.fk_field)),
+                return (model._meta.pk.to_python(getattr(obj, self.fk_field)),
                         model)
+
+        def obj_key(obj):
+            model = obj.__class__
+            return (model._meta.pk.to_python(obj.pk), model)
 
         return (
             ret_val,
-            lambda obj: (obj.pk, obj.__class__),
+            obj_key,
             gfk_key,
             True,
             self.name,
@@ -576,7 +580,7 @@ def create_generic_related_manager(superclass, rel):
             return (
                 queryset.filter(**query),
                 lambda relobj: object_id_converter(getattr(relobj, self.object_id_field_name)),
-                lambda obj: obj.pk,
+                lambda obj: object_id_converter(obj.pk),
                 False,
                 self.prefetch_cache_name,
                 False,

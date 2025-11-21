@@ -295,3 +295,22 @@ class Flea(models.Model):
     current_room = models.ForeignKey(Room, models.SET_NULL, related_name='fleas', null=True)
     pets_visited = models.ManyToManyField(Pet, related_name='fleas_hosted')
     people_visited = models.ManyToManyField(Person, related_name='fleas_hosted')
+
+
+# Models for GenericForeignKey with UUID PK tests
+
+class UUIDTaggedItem(models.Model):
+    tag = models.SlugField()
+    content_type = models.ForeignKey(
+        ContentType,
+        models.CASCADE,
+        related_name="uuidtaggeditem_set",
+    )
+    object_id = models.CharField(max_length=255)
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return self.tag

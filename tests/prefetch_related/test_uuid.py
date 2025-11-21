@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from .models import Flea, House, Person, Pet, Room
+from .models import Flea, House, Person, Pet, Room, UUIDTaggedItem
 
 
 class UUIDPrefetchRelated(TestCase):
@@ -102,3 +102,24 @@ class UUIDPrefetchRelatedLookups(TestCase):
             redwood = House.objects.prefetch_related('rooms__fleas__pets_visited').get(name='Redwood')
         with self.assertNumQueries(0):
             self.assertEqual('Spooky', redwood.rooms.all()[0].fleas.all()[0].pets_visited.all()[0].name)
+
+
+class UUIDGenericForeignKeyPrefetch(TestCase):
+
+    def test_prefetch_gfk_with_uuid_pk(self):
+        """
+        Test that prefetch_related works with GenericForeignKey when the
+        related model has a UUID primary key.
+        """
+        pet = Pet.objects.create(name='Fifi')
+        tag = UUIDTaggedItem.objects.create(tag='awesome', content_object=pet)
+
+        # 1 for UUIDTaggedItem table, 1 for Pet table
+        with self.assertNumQueries(2):
+            qs = UUIDTaggedItem.objects.prefetch_related('content_object')
+            result = list(qs)
+
+        # Verify the prefetch worked and content_object is not None
+        self.assertEqual(len(result), 1)
+        self.assertIsNotNone(result[0].content_object)
+        self.assertEqual(result[0].content_object.name, 'Fifi')
