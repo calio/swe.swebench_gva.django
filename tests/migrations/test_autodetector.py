@@ -1128,6 +1128,35 @@ class AutodetectorTests(TestCase):
         self.assertOperationTypes(changes, 'otherapp', 0, ["RenameField"])
         self.assertOperationAttributes(changes, 'otherapp', 0, 0, old_name="author", new_name="writer")
 
+    def test_rename_model_and_rename_field(self):
+        """
+        Tests autodetection of renamed models while simultaneously renaming a field
+        in the same model.
+        Regression test for issue where renaming a model and renaming a field in the same
+        step would cause a KeyError in generate_renamed_fields().
+        """
+        # Create initial state with MyModel with a field 'old_name'
+        initial_model = ModelState("testapp", "MyModel", [
+            ("id", models.AutoField(primary_key=True)),
+            ("old_name", models.CharField(max_length=200)),
+        ])
+        # Create new state with MyModel2 (renamed) and field renamed to 'new_name'
+        renamed_model = ModelState("testapp", "MyModel2", [
+            ("id", models.AutoField(primary_key=True)),
+            ("new_name", models.CharField(max_length=200)),
+        ])
+        # This should not raise a KeyError in generate_renamed_fields()
+        changes = self.get_changes(
+            [initial_model],
+            [renamed_model],
+            MigrationQuestioner({"ask_rename_model": True, "ask_rename": True}),
+        )
+        # The autodetector should detect the rename and rename the field
+        self.assertNumberMigrations(changes, 'testapp', 1)
+        self.assertOperationTypes(changes, 'testapp', 0, ["RenameModel", "RenameField"])
+        self.assertOperationAttributes(changes, 'testapp', 0, 0, old_name="MyModel", new_name="MyModel2")
+        self.assertOperationAttributes(changes, 'testapp', 0, 1, model_name="mymodel2", old_name="old_name", new_name="new_name")
+
     def test_rename_model_with_fks_in_different_position(self):
         """
         #24537 - The order of fields in a model does not influence
