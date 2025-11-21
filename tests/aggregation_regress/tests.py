@@ -1525,6 +1525,35 @@ class AggregationTests(TestCase):
             allow_distinct = True
         DistinctAggregate('foo', distinct=True)
 
+    def test_meta_ordering_not_in_group_by(self):
+        """
+        Regression test for #14357/#14122 - Meta.ordering fields should not be
+        included in GROUP BY clause when using values() and annotate().
+        """
+        # Book has Meta.ordering = ('name',)
+        # When using values('name').annotate(), the GROUP BY should only contain
+        # the 'name' field from values(), not any additional fields from Meta.ordering
+        qs = Book.objects.values('name').annotate(count=Count('id'))
+        sql = str(qs.query)
+        
+        # The GROUP BY clause should only contain the 'name' field
+        # We check that the SQL doesn't have duplicate 'name' fields in GROUP BY
+        # which would happen if Meta.ordering was incorrectly added
+        self.assertIn('GROUP BY', sql)
+        
+        # Count occurrences of the name field in GROUP BY
+        # Extract the GROUP BY clause
+        group_by_start = sql.find('GROUP BY')
+        group_by_end = sql.find('HAVING') if 'HAVING' in sql else sql.find('ORDER BY') if 'ORDER BY' in sql else len(sql)
+        if group_by_end == -1:
+            group_by_end = len(sql)
+        group_by_clause = sql[group_by_start:group_by_end]
+        
+        # The GROUP BY should only have one reference to the name field
+        # Count how many times the name column appears in GROUP BY
+        name_count = group_by_clause.count('"name"')
+        self.assertEqual(name_count, 1, f"Expected 1 'name' field in GROUP BY, got {name_count}. SQL: {sql}")
+
 
 class JoinPromotionTests(TestCase):
     def test_ticket_21150(self):
