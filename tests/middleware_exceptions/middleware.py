@@ -1,3 +1,4 @@
+from django.core.exceptions import MiddlewareNotUsed
 from django.http import Http404, HttpResponse
 from django.template import engines
 from django.template.response import TemplateResponse
@@ -130,3 +131,23 @@ class NotSyncOrAsyncMiddleware(BaseMiddleware):
 
     def __call__(self, request):
         return self.get_response(request)
+
+
+class SyncOnlyMiddlewareNotUsed(BaseMiddleware):
+    """Sync-only middleware that raises MiddlewareNotUsed."""
+    sync_capable = True
+    async_capable = False
+
+    def __init__(self, get_response):
+        raise MiddlewareNotUsed
+
+
+class SyncMiddlewareAfterNotUsed(BaseMiddleware):
+    """Sync middleware that comes after a MiddlewareNotUsed middleware."""
+    sync_capable = True
+    async_capable = False
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response['X-Sync-Middleware'] = 'applied'
+        return response

@@ -339,3 +339,41 @@ class AsyncMiddlewareTests(SimpleTestCase):
     async def test_process_view_return_response(self):
         response = await self.async_client.get('/middleware_exceptions/view/')
         self.assertEqual(response.content, b'Processed view normal_view')
+
+
+@override_settings(ROOT_URLCONF='middleware_exceptions.urls')
+class MiddlewareNotUsedAsyncTests(SimpleTestCase):
+    """Tests for MiddlewareNotUsed in ASGI context."""
+
+    @override_settings(MIDDLEWARE=[
+        'middleware_exceptions.middleware.SyncOnlyMiddlewareNotUsed',
+        'middleware_exceptions.middleware.SyncMiddlewareAfterNotUsed',
+    ])
+    async def test_sync_middleware_not_used_in_async_context(self):
+        """
+        Test that when a sync-only middleware raises MiddlewareNotUsed in an
+        ASGI context, the next middleware in the chain is not "poisoned" with
+        an incorrectly adapted handler.
+        """
+        response = await self.async_client.get('/middleware_exceptions/view/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b'OK')
+        # Verify the middleware after MiddlewareNotUsed was applied correctly
+        self.assertIn('X-Sync-Middleware', response)
+        self.assertEqual(response['X-Sync-Middleware'], 'applied')
+
+    @override_settings(MIDDLEWARE=[
+        'middleware_exceptions.middleware.SyncOnlyMiddlewareNotUsed',
+        'middleware_exceptions.middleware.SyncMiddlewareAfterNotUsed',
+    ])
+    def test_sync_middleware_not_used_in_sync_context(self):
+        """
+        Test that when a sync-only middleware raises MiddlewareNotUsed in a
+        WSGI context, the next middleware in the chain works correctly.
+        """
+        response = self.client.get('/middleware_exceptions/view/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b'OK')
+        # Verify the middleware after MiddlewareNotUsed was applied correctly
+        self.assertIn('X-Sync-Middleware', response)
+        self.assertEqual(response['X-Sync-Middleware'], 'applied')

@@ -1,0 +1,97 @@
+diff --git a/django/core/handlers/base.py b/django/core/handlers/base.py
+index 8e8c3da06a..be8a114eb1 100644
+--- a/django/core/handlers/base.py
++++ b/django/core/handlers/base.py
+@@ -51,11 +51,11 @@ class BaseHandler:
+                 middleware_is_async = middleware_can_async
+             try:
+                 # Adapt handler, if needed.
+-                handler = self.adapt_method_mode(
++                adapted_handler = self.adapt_method_mode(
+                     middleware_is_async, handler, handler_is_async,
+                     debug=settings.DEBUG, name='middleware %s' % middleware_path,
+                 )
+-                mw_instance = middleware(handler)
++                mw_instance = middleware(adapted_handler)
+             except MiddlewareNotUsed as exc:
+                 if settings.DEBUG:
+                     if str(exc):
+diff --git a/tests/middleware_exceptions/middleware.py b/tests/middleware_exceptions/middleware.py
+index 9fb9726b50..1283a1cd42 100644
+--- a/tests/middleware_exceptions/middleware.py
++++ b/tests/middleware_exceptions/middleware.py
+@@ -1,3 +1,4 @@
++from django.core.exceptions import MiddlewareNotUsed
+ from django.http import Http404, HttpResponse
+ from django.template import engines
+ from django.template.response import TemplateResponse
+@@ -130,3 +131,23 @@ class NotSyncOrAsyncMiddleware(BaseMiddleware):
+ 
+     def __call__(self, request):
+         return self.get_response(request)
++
++
++class SyncOnlyMiddlewareNotUsed(BaseMiddleware):
++    """Sync-only middleware that raises MiddlewareNotUsed."""
++    sync_capable = True
++    async_capable = False
++
++    def __init__(self, get_response):
++        raise MiddlewareNotUsed
++
++
++class SyncMiddlewareAfterNotUsed(BaseMiddleware):
++    """Sync middleware that comes after a MiddlewareNotUsed middleware."""
++    sync_capable = True
++    async_capable = False
++
++    def __call__(self, request):
++        response = self.get_response(request)
++        response['X-Sync-Middleware'] = 'applied'
++        return response
+diff --git a/tests/middleware_exceptions/tests.py b/tests/middleware_exceptions/tests.py
+index 8b019ba524..e6e35899c7 100644
+--- a/tests/middleware_exceptions/tests.py
++++ b/tests/middleware_exceptions/tests.py
+@@ -339,3 +339,41 @@ class AsyncMiddlewareTests(SimpleTestCase):
+     async def test_process_view_return_response(self):
+         response = await self.async_client.get('/middleware_exceptions/view/')
+         self.assertEqual(response.content, b'Processed view normal_view')
++
++
++@override_settings(ROOT_URLCONF='middleware_exceptions.urls')
++class MiddlewareNotUsedAsyncTests(SimpleTestCase):
++    """Tests for MiddlewareNotUsed in ASGI context."""
++
++    @override_settings(MIDDLEWARE=[
++        'middleware_exceptions.middleware.SyncOnlyMiddlewareNotUsed',
++        'middleware_exceptions.middleware.SyncMiddlewareAfterNotUsed',
++    ])
++    async def test_sync_middleware_not_used_in_async_context(self):
++        """
++        Test that when a sync-only middleware raises MiddlewareNotUsed in an
++        ASGI context, the next middleware in the chain is not "poisoned" with
++        an incorrectly adapted handler.
++        """
++        response = await self.async_client.get('/middleware_exceptions/view/')
++        self.assertEqual(response.status_code, 200)
++        self.assertEqual(response.content, b'OK')
++        # Verify the middleware after MiddlewareNotUsed was applied correctly
++        self.assertIn('X-Sync-Middleware', response)
++        self.assertEqual(response['X-Sync-Middleware'], 'applied')
++
++    @override_settings(MIDDLEWARE=[
++        'middleware_exceptions.middleware.SyncOnlyMiddlewareNotUsed',
++        'middleware_exceptions.middleware.SyncMiddlewareAfterNotUsed',
++    ])
++    def test_sync_middleware_not_used_in_sync_context(self):
++        """
++        Test that when a sync-only middleware raises MiddlewareNotUsed in a
++        WSGI context, the next middleware in the chain works correctly.
++        """
++        response = self.client.get('/middleware_exceptions/view/')
++        self.assertEqual(response.status_code, 200)
++        self.assertEqual(response.content, b'OK')
++        # Verify the middleware after MiddlewareNotUsed was applied correctly
++        self.assertIn('X-Sync-Middleware', response)
++        self.assertEqual(response['X-Sync-Middleware'], 'applied')
