@@ -1,0 +1,154 @@
+diff --git a/django/contrib/admin/checks.py b/django/contrib/admin/checks.py
+index f82c20c2f1..9fd77b5d41 100644
+--- a/django/contrib/admin/checks.py
++++ b/django/contrib/admin/checks.py
+@@ -720,33 +720,33 @@ class ModelAdminChecks(BaseModelAdminChecks):
+             return []
+         elif hasattr(obj, item):
+             return []
+-        elif hasattr(obj.model, item):
++        else:
+             try:
+                 field = obj.model._meta.get_field(item)
+             except FieldDoesNotExist:
+-                return []
+-            else:
+-                if isinstance(field, models.ManyToManyField):
++                try:
++                    field = getattr(obj.model, item)
++                except AttributeError:
+                     return [
+                         checks.Error(
+-                            "The value of '%s' must not be a ManyToManyField." % label,
++                            "The value of '%s' refers to '%s', which is not a callable, "
++                            "an attribute of '%s', or an attribute or method on '%s.%s'." % (
++                                label, item, obj.__class__.__name__,
++                                obj.model._meta.app_label, obj.model._meta.object_name,
++                            ),
+                             obj=obj.__class__,
+-                            id='admin.E109',
++                            id='admin.E108',
+                         )
+                     ]
+-                return []
+-        else:
+-            return [
+-                checks.Error(
+-                    "The value of '%s' refers to '%s', which is not a callable, "
+-                    "an attribute of '%s', or an attribute or method on '%s.%s'." % (
+-                        label, item, obj.__class__.__name__,
+-                        obj.model._meta.app_label, obj.model._meta.object_name,
+-                    ),
+-                    obj=obj.__class__,
+-                    id='admin.E108',
+-                )
+-            ]
++            if isinstance(field, models.ManyToManyField):
++                return [
++                    checks.Error(
++                        "The value of '%s' must not be a ManyToManyField." % label,
++                        obj=obj.__class__,
++                        id='admin.E109',
++                    )
++                ]
++            return []
+ 
+     def _check_list_display_links(self, obj):
+         """ Check that list_display_links is a unique subset of list_display.
+diff --git a/tests/admin_checks/models.py b/tests/admin_checks/models.py
+index 3336ce878e..da7ea6a163 100644
+--- a/tests/admin_checks/models.py
++++ b/tests/admin_checks/models.py
+@@ -7,6 +7,21 @@ from django.contrib.contenttypes.models import ContentType
+ from django.db import models
+ 
+ 
++class InstanceOnlyDescriptor(models.Field):
++    """
++    A descriptor field that only works on instances, not on the class.
++    This simulates the behavior of PositionField from django-positions.
++    """
++    def __get__(self, obj, objtype=None):
++        if obj is None:
++            # Raise an exception when accessed on the class
++            raise AttributeError("Descriptor only works on instances")
++        return getattr(obj.__dict__, 'instance_only_value', None)
++
++    def __set__(self, obj, value):
++        obj.__dict__['instance_only_value'] = value
++
++
+ class Album(models.Model):
+     title = models.CharField(max_length=150)
+ 
+@@ -64,3 +79,9 @@ class Influence(models.Model):
+     content_type = models.ForeignKey(ContentType, models.CASCADE)
+     object_id = models.PositiveIntegerField()
+     content_object = GenericForeignKey('content_type', 'object_id')
++
++
++class Thing(models.Model):
++    """Model with an instance-only descriptor field."""
++    number = models.IntegerField(default=0)
++    order = InstanceOnlyDescriptor()
+diff --git a/tests/admin_checks/tests.py b/tests/admin_checks/tests.py
+index 1e267e03a3..7453c89aa0 100644
+--- a/tests/admin_checks/tests.py
++++ b/tests/admin_checks/tests.py
+@@ -913,3 +913,56 @@ class SystemChecksTestCase(SimpleTestCase):
+             self.assertEqual(errors, [])
+         finally:
+             Book._meta.apps.ready = True
++
++    def test_list_display_with_instance_only_descriptor(self):
++        """
++        Test that list_display works with fields that are instance-only descriptors.
++        This tests the fix for issue where admin.E108 was incorrectly raised for
++        fields like PositionField that have descriptors only accessible on instances.
++        """
++        from .models import Thing
++
++        class ThingAdmin(admin.ModelAdmin):
++            list_display = ['number', 'order']
++
++        errors = ThingAdmin(Thing, AdminSite()).check()
++        self.assertEqual(errors, [])
++
++    def test_list_display_with_instance_only_descriptor_and_m2m(self):
++        """
++        Test that list_display correctly identifies ManyToManyField even when
++        other fields are instance-only descriptors.
++        """
++        from .models import Thing
++
++        class ThingAdmin(admin.ModelAdmin):
++            list_display = ['number', 'order', 'album']
++
++        errors = ThingAdmin(Thing, AdminSite()).check()
++        # Should have an error for 'album' which doesn't exist on Thing
++        self.assertEqual(len(errors), 1)
++        self.assertEqual(errors[0].id, 'admin.E108')
++
++    def test_list_display_with_nonexistent_field(self):
++        """
++        Test that list_display correctly reports E108 for nonexistent fields.
++        """
++        from .models import Thing
++
++        class ThingAdmin(admin.ModelAdmin):
++            list_display = ['number', 'nonexistent']
++
++        errors = ThingAdmin(Thing, AdminSite()).check()
++        self.assertEqual(len(errors), 1)
++        self.assertEqual(errors[0].id, 'admin.E108')
++
++    def test_list_display_with_m2m_field(self):
++        """
++        Test that list_display correctly reports E109 for ManyToManyField.
++        """
++        class BookAdmin(admin.ModelAdmin):
++            list_display = ['name', 'authors']
++
++        errors = BookAdmin(Book, AdminSite()).check()
++        self.assertEqual(len(errors), 1)
++        self.assertEqual(errors[0].id, 'admin.E109')

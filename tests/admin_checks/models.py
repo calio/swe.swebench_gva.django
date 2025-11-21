@@ -7,6 +7,21 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 
+class InstanceOnlyDescriptor(models.Field):
+    """
+    A descriptor field that only works on instances, not on the class.
+    This simulates the behavior of PositionField from django-positions.
+    """
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            # Raise an exception when accessed on the class
+            raise AttributeError("Descriptor only works on instances")
+        return getattr(obj.__dict__, 'instance_only_value', None)
+
+    def __set__(self, obj, value):
+        obj.__dict__['instance_only_value'] = value
+
+
 class Album(models.Model):
     title = models.CharField(max_length=150)
 
@@ -64,3 +79,9 @@ class Influence(models.Model):
     content_type = models.ForeignKey(ContentType, models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
+
+
+class Thing(models.Model):
+    """Model with an instance-only descriptor field."""
+    number = models.IntegerField(default=0)
+    order = InstanceOnlyDescriptor()

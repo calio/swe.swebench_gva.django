@@ -913,3 +913,56 @@ class SystemChecksTestCase(SimpleTestCase):
             self.assertEqual(errors, [])
         finally:
             Book._meta.apps.ready = True
+
+    def test_list_display_with_instance_only_descriptor(self):
+        """
+        Test that list_display works with fields that are instance-only descriptors.
+        This tests the fix for issue where admin.E108 was incorrectly raised for
+        fields like PositionField that have descriptors only accessible on instances.
+        """
+        from .models import Thing
+
+        class ThingAdmin(admin.ModelAdmin):
+            list_display = ['number', 'order']
+
+        errors = ThingAdmin(Thing, AdminSite()).check()
+        self.assertEqual(errors, [])
+
+    def test_list_display_with_instance_only_descriptor_and_m2m(self):
+        """
+        Test that list_display correctly identifies ManyToManyField even when
+        other fields are instance-only descriptors.
+        """
+        from .models import Thing
+
+        class ThingAdmin(admin.ModelAdmin):
+            list_display = ['number', 'order', 'album']
+
+        errors = ThingAdmin(Thing, AdminSite()).check()
+        # Should have an error for 'album' which doesn't exist on Thing
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].id, 'admin.E108')
+
+    def test_list_display_with_nonexistent_field(self):
+        """
+        Test that list_display correctly reports E108 for nonexistent fields.
+        """
+        from .models import Thing
+
+        class ThingAdmin(admin.ModelAdmin):
+            list_display = ['number', 'nonexistent']
+
+        errors = ThingAdmin(Thing, AdminSite()).check()
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].id, 'admin.E108')
+
+    def test_list_display_with_m2m_field(self):
+        """
+        Test that list_display correctly reports E109 for ManyToManyField.
+        """
+        class BookAdmin(admin.ModelAdmin):
+            list_display = ['name', 'authors']
+
+        errors = BookAdmin(Book, AdminSite()).check()
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].id, 'admin.E109')
