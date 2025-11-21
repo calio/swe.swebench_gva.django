@@ -8,7 +8,7 @@ from django.db.models import (
 from django.db.models.functions import Upper
 from django.test import TestCase
 
-from .models import Article, Author, ChildArticle, OrderedByFArticle, Reference
+from .models import Article, Author, ChildArticle, OrderedByFArticle, Reference, OneModel, TwoModel
 
 
 class OrderingTests(TestCase):
@@ -480,3 +480,49 @@ class OrderingTests(TestCase):
         ca4 = ChildArticle.objects.create(headline='h1', pub_date=datetime(2005, 7, 28))
         articles = ChildArticle.objects.order_by('article_ptr')
         self.assertSequenceEqual(articles, [ca4, ca2, ca1, ca3])
+
+    def test_order_by_self_referencing_fk_id_field(self):
+        """
+        Test that ordering by a self-referencing foreign key's _id field
+        doesn't create unnecessary joins and respects explicit order_by().
+        Regression test for issue where order_by("record__root_id") was
+        generating incorrect SQL with extra LEFT OUTER JOIN and applying
+        the model's default ordering instead of the explicit order_by().
+        """
+        # Create test data
+        root1 = OneModel.objects.create(id=1, root=None, oneval=1)
+        root2 = OneModel.objects.create(id=2, root=None, oneval=2)
+        child1 = OneModel.objects.create(id=3, root=root1, oneval=1)
+        child2 = OneModel.objects.create(id=4, root=root2, oneval=2)
+
+        TwoModel.objects.create(id=1, record=root1, twoval=10)
+        TwoModel.objects.create(id=2, record=root2, twoval=20)
+        TwoModel.objects.create(id=3, record=child1, twoval=30)
+        TwoModel.objects.create(id=4, record=child2, twoval=40)
+
+        # Test 1: order_by("record__root_id") should work correctly
+        qs = TwoModel.objects.filter(record__oneval__in=[1, 2]).order_by("record__root_id")
+        query_str = str(qs.query)
+        
+        # Should not have extra LEFT OUTER JOIN for self-referencing FK
+        # Count the number of JOINs - should be 1 (only the INNER JOIN for record)
+        join_count = query_str.count('JOIN')
+        self.assertEqual(join_count, 1, f"Expected 1 JOIN, got {join_count}. Query: {query_str}")
+        
+        # Should order by ASC (not DESC from model's default ordering)
+        self.assertIn('ORDER BY', query_str)
+        # The ordering should be ASC for root_id
+        self.assertIn('ASC', query_str)
+        
+        # Test 2: order_by("record__root__id") should also work correctly
+        qs = TwoModel.objects.filter(record__oneval__in=[1, 2]).order_by("record__root__id")
+        query_str = str(qs.query)
+        join_count = query_str.count('JOIN')
+        self.assertEqual(join_count, 1, f"Expected 1 JOIN, got {join_count}. Query: {query_str}")
+        
+        # Test 3: order_by("-record__root_id") should work correctly with DESC
+        qs = TwoModel.objects.filter(record__oneval__in=[1, 2]).order_by("-record__root_id")
+        query_str = str(qs.query)
+        join_count = query_str.count('JOIN')
+        self.assertEqual(join_count, 1, f"Expected 1 JOIN, got {join_count}. Query: {query_str}")
+        self.assertIn('DESC', query_str)
