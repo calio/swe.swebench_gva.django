@@ -58,3 +58,21 @@ class ShadowParent(models.Model):
 
 class ShadowChild(ShadowParent):
     name = models.CharField(default="adonis", max_length=6)
+
+
+class CustomModel(models.Model):
+    name = models.CharField(max_length=16)
+
+
+class ProxyCustomModel(CustomModel):
+    class Meta:
+        proxy = True
+
+
+class AnotherModel(models.Model):
+    custom = models.ForeignKey(
+        ProxyCustomModel,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )

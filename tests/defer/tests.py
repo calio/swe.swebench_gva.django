@@ -2,10 +2,13 @@ from django.core.exceptions import FieldError
 from django.test import TestCase
 
 from .models import (
+    AnotherModel,
     BigChild,
     Child,
     ChildProxy,
+    CustomModel,
     Primary,
+    ProxyCustomModel,
     RefreshPrimaryProxy,
     Secondary,
     ShadowChild,
@@ -299,3 +302,18 @@ class TestDefer2(AssertionMixin, TestCase):
             # access of any of them.
             self.assertEqual(rf2.name, "new foo")
             self.assertEqual(rf2.value, "new bar")
+
+    def test_only_with_select_related_on_proxy_fk(self):
+        """
+        Test that select_related() with only() works correctly when the
+        ForeignKey points to a proxy model. Regression test for #15814.
+        """
+        custom = CustomModel.objects.create(name="test")
+        another = AnotherModel.objects.create(custom=custom)
+        
+        # This should not raise ValueError: 'id' is not in list
+        result = list(
+            AnotherModel.objects.select_related("custom").only("custom__name")
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].custom.name, "test")
