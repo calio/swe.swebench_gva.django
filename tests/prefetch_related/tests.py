@@ -13,7 +13,7 @@ from .models import (
     Article, Author, Author2, AuthorAddress, AuthorWithAge, Bio, Book,
     Bookmark, BookReview, BookWithYear, Comment, Department, Employee,
     FavoriteAuthors, House, LessonEntry, ModelIterableSubclass, Person,
-    Qualification, Reader, Room, TaggedItem, Teacher, WordEntry,
+    Profile, Qualification, Reader, Room, TaggedItem, Teacher, User, WordEntry,
 )
 
 
@@ -1614,3 +1614,42 @@ class ReadPrefetchedObjectsCacheTests(TestCase):
         with self.assertNumQueries(4):
             # AuthorWithAge -> Author -> FavoriteAuthors, Book
             self.assertSequenceEqual(authors, [self.author1, self.author2])
+
+
+class DeferredFieldsInNestedPrefetchTests(TestCase):
+    """
+    Tests for deferred fields in nested prefetch_related queries.
+    Regression test for issue where deferred fields from inner querysets
+    were not properly applied when following prefetches back to parent objects.
+    """
+
+    def test_only_related_queryset_with_onetoone(self):
+        """
+        Test that deferred fields are correctly applied in nested Prefetch
+        with OneToOneField relationships.
+        """
+        user = User.objects.create(
+            email="test@example.com",
+            kind="ADMIN",
+        )
+        Profile.objects.create(user=user, full_name="Test Tester")
+        
+        queryset = User.objects.only("email").prefetch_related(
+            Prefetch(
+                "profile",
+                queryset=Profile.objects.prefetch_related(
+                    Prefetch("user", queryset=User.objects.only("kind"))
+                ),
+            )
+        )
+        
+        with self.assertNumQueries(3):
+            user = queryset.first()
+        
+        # This should not trigger a query because 'kind' should be deferred
+        # on the inner User instance
+        with self.assertNumQueries(0):
+            self.assertEqual(user.profile.user.kind, "ADMIN")
+        
+        # Verify that deferred fields are correctly set
+        self.assertEqual(user.profile.user.get_deferred_fields(), {'kind'})

@@ -282,3 +282,23 @@ class Flea(models.Model):
     current_room = models.ForeignKey(Room, models.SET_NULL, related_name='fleas', null=True)
     pets_visited = models.ManyToManyField(Pet, related_name='fleas_hosted')
     people_visited = models.ManyToManyField(Person, related_name='fleas_hosted')
+
+
+# Models for deferred fields in nested prefetch tests
+
+class User(models.Model):
+    email = models.EmailField()
+    kind = models.CharField(
+        max_length=10, choices=[("ADMIN", "Admin"), ("REGULAR", "Regular")]
+    )
+
+    class Meta:
+        ordering = ['id']
+
+
+class Profile(models.Model):
+    full_name = models.CharField(max_length=255)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ['id']
