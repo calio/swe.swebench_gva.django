@@ -110,3 +110,21 @@ class TokenGeneratorTest(TestCase):
         legacy_token = p_old_generator.make_token(user)
         self.assertIs(p_old_generator.check_token(user, legacy_token), True)
         self.assertIs(p_new_generator.check_token(user, legacy_token), True)
+
+    def test_token_invalidated_by_email_change(self):
+        """
+        Changing a user's email address should invalidate password reset tokens.
+        """
+        user = User.objects.create_user('tokentestuser', 'test@example.com', 'testpw')
+        generator = PasswordResetTokenGenerator()
+        token = generator.make_token(user)
+        
+        # Token should be valid with original email
+        self.assertIs(generator.check_token(user, token), True)
+        
+        # Change the user's email
+        user.email = 'newemail@example.com'
+        user.save()
+        
+        # Token should be invalid after email change
+        self.assertIs(generator.check_token(user, token), False)
