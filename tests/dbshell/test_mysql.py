@@ -197,7 +197,7 @@ class MySqlDbshellCommandTestCase(SimpleTestCase):
                 },
                 ["--help"],
             ),
-            (["mysql", "somedbname", "--help"], None),
+            (["mysql", "--help", "somedbname"], None),
         )
 
     def test_crash_password_does_not_leak(self):

@@ -56,9 +56,9 @@ class DatabaseClient(BaseDatabaseClient):
             args += ["--ssl-key=%s" % client_key]
         if charset:
             args += ["--default-character-set=%s" % charset]
+        args.extend(parameters)
         if database:
             args += [database]
-        args.extend(parameters)
         return args, env
 
     def runshell(self, parameters):
