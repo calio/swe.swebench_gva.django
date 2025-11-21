@@ -1302,7 +1302,7 @@ class Window(Expression):
         connection.ops.check_expression_support(self)
         if not connection.features.supports_over_clause:
             raise NotSupportedError('This backend does not support window expressions.')
-        expr_sql, params = compiler.compile(self.source_expression)
+        expr_sql, params = self.source_expression.as_sql(compiler, connection)
         window_sql, window_params = [], []
 
         if self.partition_by is not None:
@@ -1331,6 +1331,15 @@ class Window(Expression):
             'expression': expr_sql,
             'window': ''.join(window_sql).strip()
         }, params
+
+    def as_sqlite(self, compiler, connection, **extra_context):
+        sql, params = self.as_sql(compiler, connection, **extra_context)
+        try:
+            if self.output_field.get_internal_type() == 'DecimalField':
+                sql = 'CAST(%s AS NUMERIC)' % sql
+        except FieldError:
+            pass
+        return sql, params
 
     def __str__(self):
         return '{} OVER ({}{}{})'.format(

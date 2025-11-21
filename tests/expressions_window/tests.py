@@ -202,6 +202,70 @@ class WindowFunctionTests(TestCase):
             ('Smith', 55000, 'Sales', 53000),
         ], transform=lambda row: (row.name, row.salary, row.department, row.lag))
 
+    def test_lag_decimal_field(self):
+        """
+        Test that Lag works correctly with DecimalField on SQLite.
+        This is a regression test for issue where CAST was incorrectly placed.
+        """
+        from decimal import Decimal
+        # Add bonus data to employees
+        for i, emp in enumerate(Employee.objects.all()):
+            emp.bonus = Decimal('100.5000') + i
+            emp.save()
+        
+        qs = Employee.objects.annotate(lag_bonus=Window(
+            expression=Lag(expression='bonus', offset=1),
+            partition_by=F('department'),
+            order_by=[F('salary').asc(), F('name').asc()],
+        )).order_by('department', F('salary').asc(), F('name').asc())
+        
+        # Just verify the query executes without error
+        results = list(qs)
+        self.assertEqual(len(results), 12)
+
+    def test_lead_decimal_field(self):
+        """
+        Test that Lead works correctly with DecimalField on SQLite.
+        This is a regression test for issue where CAST was incorrectly placed.
+        """
+        from decimal import Decimal
+        from django.db.models.functions import Lead
+        # Add bonus data to employees
+        for i, emp in enumerate(Employee.objects.all()):
+            emp.bonus = Decimal('100.5000') + i
+            emp.save()
+        
+        qs = Employee.objects.annotate(lead_bonus=Window(
+            expression=Lead(expression='bonus', offset=1),
+            partition_by=F('department'),
+            order_by=[F('salary').asc(), F('name').asc()],
+        )).order_by('department', F('salary').asc(), F('name').asc())
+        
+        # Just verify the query executes without error
+        results = list(qs)
+        self.assertEqual(len(results), 12)
+
+    def test_first_value_decimal_field(self):
+        """
+        Test that FirstValue works correctly with DecimalField on SQLite.
+        This is a regression test for issue where CAST was incorrectly placed.
+        """
+        from decimal import Decimal
+        # Add bonus data to employees
+        for i, emp in enumerate(Employee.objects.all()):
+            emp.bonus = Decimal('100.5000') + i
+            emp.save()
+        
+        qs = Employee.objects.annotate(first_bonus=Window(
+            expression=FirstValue('bonus'),
+            partition_by=F('department'),
+            order_by=F('hire_date').asc(),
+        )).order_by('department', 'hire_date')
+        
+        # Just verify the query executes without error
+        results = list(qs)
+        self.assertEqual(len(results), 12)
+
     def test_first_value(self):
         qs = Employee.objects.annotate(first_value=Window(
             expression=FirstValue('salary'),

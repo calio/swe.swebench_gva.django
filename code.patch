@@ -1,0 +1,113 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 90d90119d0..87edecad3d 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1302,7 +1302,7 @@ class Window(Expression):
+         connection.ops.check_expression_support(self)
+         if not connection.features.supports_over_clause:
+             raise NotSupportedError('This backend does not support window expressions.')
+-        expr_sql, params = compiler.compile(self.source_expression)
++        expr_sql, params = self.source_expression.as_sql(compiler, connection)
+         window_sql, window_params = [], []
+ 
+         if self.partition_by is not None:
+@@ -1332,6 +1332,15 @@ class Window(Expression):
+             'window': ''.join(window_sql).strip()
+         }, params
+ 
++    def as_sqlite(self, compiler, connection, **extra_context):
++        sql, params = self.as_sql(compiler, connection, **extra_context)
++        try:
++            if self.output_field.get_internal_type() == 'DecimalField':
++                sql = 'CAST(%s AS NUMERIC)' % sql
++        except FieldError:
++            pass
++        return sql, params
++
+     def __str__(self):
+         return '{} OVER ({}{}{})'.format(
+             str(self.source_expression),
+diff --git a/tests/expressions_window/models.py b/tests/expressions_window/models.py
+index ce6f6621e9..3585118ed1 100644
+--- a/tests/expressions_window/models.py
++++ b/tests/expressions_window/models.py
+@@ -12,3 +12,4 @@ class Employee(models.Model):
+     hire_date = models.DateField(blank=False, null=False)
+     age = models.IntegerField(blank=False, null=False)
+     classification = models.ForeignKey('Classification', on_delete=models.CASCADE, null=True)
++    bonus = models.DecimalField(decimal_places=4, max_digits=7, null=True, blank=True)
+diff --git a/tests/expressions_window/tests.py b/tests/expressions_window/tests.py
+index 30ed64f529..d4ba937a9c 100644
+--- a/tests/expressions_window/tests.py
++++ b/tests/expressions_window/tests.py
+@@ -202,6 +202,70 @@ class WindowFunctionTests(TestCase):
+             ('Smith', 55000, 'Sales', 53000),
+         ], transform=lambda row: (row.name, row.salary, row.department, row.lag))
+ 
++    def test_lag_decimal_field(self):
++        """
++        Test that Lag works correctly with DecimalField on SQLite.
++        This is a regression test for issue where CAST was incorrectly placed.
++        """
++        from decimal import Decimal
++        # Add bonus data to employees
++        for i, emp in enumerate(Employee.objects.all()):
++            emp.bonus = Decimal('100.5000') + i
++            emp.save()
++        
++        qs = Employee.objects.annotate(lag_bonus=Window(
++            expression=Lag(expression='bonus', offset=1),
++            partition_by=F('department'),
++            order_by=[F('salary').asc(), F('name').asc()],
++        )).order_by('department', F('salary').asc(), F('name').asc())
++        
++        # Just verify the query executes without error
++        results = list(qs)
++        self.assertEqual(len(results), 12)
++
++    def test_lead_decimal_field(self):
++        """
++        Test that Lead works correctly with DecimalField on SQLite.
++        This is a regression test for issue where CAST was incorrectly placed.
++        """
++        from decimal import Decimal
++        from django.db.models.functions import Lead
++        # Add bonus data to employees
++        for i, emp in enumerate(Employee.objects.all()):
++            emp.bonus = Decimal('100.5000') + i
++            emp.save()
++        
++        qs = Employee.objects.annotate(lead_bonus=Window(
++            expression=Lead(expression='bonus', offset=1),
++            partition_by=F('department'),
++            order_by=[F('salary').asc(), F('name').asc()],
++        )).order_by('department', F('salary').asc(), F('name').asc())
++        
++        # Just verify the query executes without error
++        results = list(qs)
++        self.assertEqual(len(results), 12)
++
++    def test_first_value_decimal_field(self):
++        """
++        Test that FirstValue works correctly with DecimalField on SQLite.
++        This is a regression test for issue where CAST was incorrectly placed.
++        """
++        from decimal import Decimal
++        # Add bonus data to employees
++        for i, emp in enumerate(Employee.objects.all()):
++            emp.bonus = Decimal('100.5000') + i
++            emp.save()
++        
++        qs = Employee.objects.annotate(first_bonus=Window(
++            expression=FirstValue('bonus'),
++            partition_by=F('department'),
++            order_by=F('hire_date').asc(),
++        )).order_by('department', 'hire_date')
++        
++        # Just verify the query executes without error
++        results = list(qs)
++        self.assertEqual(len(results), 12)
++
+     def test_first_value(self):
+         qs = Employee.objects.annotate(first_value=Window(
+             expression=FirstValue('salary'),
