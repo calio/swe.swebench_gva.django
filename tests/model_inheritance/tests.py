@@ -522,3 +522,52 @@ class InheritanceUniqueTests(TestCase):
         msg = 'Grand parent with this First name and Last name already exists.'
         with self.assertRaisesMessage(ValidationError, msg):
             grand_child.validate_unique()
+
+
+class ResetPrimaryKeyTests(TestCase):
+    """Test resetting primary key for child models in multi-table inheritance."""
+
+    def test_reset_pk_on_child_model(self):
+        """Test that resetting pk to None on a child model creates a new instance."""
+        # Create a restaurant
+        restaurant = Restaurant.objects.create(
+            name='Test Restaurant',
+            address='123 Main St',
+            rating=5,
+        )
+        original_pk = restaurant.pk
+        self.assertIsNotNone(original_pk)
+
+        # Reset pk to None to create a new instance
+        restaurant.pk = None
+        restaurant.save()
+
+        # Check that a new instance was created
+        self.assertIsNotNone(restaurant.pk)
+        self.assertNotEqual(restaurant.pk, original_pk)
+
+        # Check that both instances exist in the database
+        self.assertEqual(Restaurant.objects.filter(name='Test Restaurant').count(), 2)
+
+    def test_reset_pk_on_grandchild_model(self):
+        """Test that resetting pk to None on a grandchild model creates a new instance."""
+        # Create an Italian restaurant
+        italian = ItalianRestaurant.objects.create(
+            name='Test Italian',
+            address='456 Oak Ave',
+            rating=4,
+            serves_gnocchi=True,
+        )
+        original_pk = italian.pk
+        self.assertIsNotNone(original_pk)
+
+        # Reset pk to None to create a new instance
+        italian.pk = None
+        italian.save()
+
+        # Check that a new instance was created
+        self.assertIsNotNone(italian.pk)
+        self.assertNotEqual(italian.pk, original_pk)
+
+        # Check that both instances exist in the database
+        self.assertEqual(ItalianRestaurant.objects.filter(name='Test Italian').count(), 2)

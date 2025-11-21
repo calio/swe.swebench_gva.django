@@ -804,9 +804,19 @@ class Model(metaclass=ModelBase):
         inserted = False
         for parent, field in meta.parents.items():
             # Make sure the link fields are synced between parent and self.
-            if (field and getattr(self, parent._meta.pk.attname) is None and
-                    getattr(self, field.attname) is not None):
-                setattr(self, parent._meta.pk.attname, getattr(self, field.attname))
+            if field:
+                parent_pk = getattr(self, parent._meta.pk.attname)
+                field_val = getattr(self, field.attname)
+                child_pk = self._get_pk_val(meta)
+                
+                # If the child's pk is None (being reset), reset the OneToOneField
+                # to None to ensure a new parent is created.
+                if child_pk is None and field_val is not None:
+                    setattr(self, field.attname, None)
+                # If the parent's pk is None and the OneToOneField has a value,
+                # sync the parent's pk from the OneToOneField.
+                elif parent_pk is None and field_val is not None:
+                    setattr(self, parent._meta.pk.attname, field_val)
             parent_inserted = self._save_parents(cls=parent, using=using, update_fields=update_fields)
             updated = self._save_table(
                 cls=parent, using=using, update_fields=update_fields,
@@ -855,6 +865,9 @@ class Model(metaclass=ModelBase):
             self._meta.pk.default and
             self._meta.pk.default is not NOT_PROVIDED
         ):
+            force_insert = True
+        # If the pk was None initially (being reset), force an INSERT.
+        if not raw and not force_insert and self._get_pk_val(meta) is None:
             force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
         if pk_set and not force_insert:
