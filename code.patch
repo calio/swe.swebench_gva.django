@@ -1,0 +1,59 @@
+diff --git a/django/contrib/staticfiles/storage.py b/django/contrib/staticfiles/storage.py
+index f957a667b2..720767aa9e 100644
+--- a/django/contrib/staticfiles/storage.py
++++ b/django/contrib/staticfiles/storage.py
+@@ -261,6 +261,7 @@ class HashedFilesMixin:
+ 
+         paths = {path: paths[path] for path in adjustable_paths}
+ 
++        substitutions = False
+         for i in range(self.max_post_process_passes):
+             substitutions = False
+             for name, hashed_name, processed, subst in self._post_process(paths, adjustable_paths, hashed_files):
+diff --git a/tests/staticfiles_tests/storage.py b/tests/staticfiles_tests/storage.py
+index 79f406ca6c..0dd984d8fb 100644
+--- a/tests/staticfiles_tests/storage.py
++++ b/tests/staticfiles_tests/storage.py
+@@ -97,3 +97,12 @@ class ExtraPatternsStorage(ManifestStaticFilesStorage):
+ class NoneHashStorage(ManifestStaticFilesStorage):
+     def file_hash(self, name, content=None):
+         return None
++
++
++class ZeroPostProcessPassesStorage(ManifestStaticFilesStorage):
++    """
++    A storage class with max_post_process_passes set to 0.
++    This is used to test that post_process doesn't crash when
++    max_post_process_passes is 0.
++    """
++    max_post_process_passes = 0
+diff --git a/tests/staticfiles_tests/test_storage.py b/tests/staticfiles_tests/test_storage.py
+index db655f2453..ebb878bfab 100644
+--- a/tests/staticfiles_tests/test_storage.py
++++ b/tests/staticfiles_tests/test_storage.py
+@@ -635,3 +635,25 @@ class TestCollectionHashedFilesCache(CollectionTestCase):
+                 content = relfile.read()
+                 self.assertIn(b'foo.57a5cb9ba68d.png', content)
+                 self.assertIn(b'xyz.57a5cb9ba68d.png', content)
++
++
++class TestZeroPostProcessPasses(CollectionTestCase):
++    """
++    Test that post_process doesn't crash when max_post_process_passes is 0.
++    Regression test for issue where UnboundLocalError was raised when
++    max_post_process_passes was set to 0.
++    """
++    def test_post_process_with_zero_passes(self):
++        """
++        post_process should not crash when max_post_process_passes is 0.
++        """
++        from .storage import ZeroPostProcessPassesStorage
++        
++        with self.settings(STATICFILES_STORAGE='staticfiles_tests.storage.ZeroPostProcessPassesStorage'):
++            finders.get_finder.cache_clear()
++            err = StringIO()
++            # This should not raise UnboundLocalError
++            call_command('collectstatic', interactive=False, verbosity=0, stderr=err)
++            # Verify that files were collected
++            self.assertTrue(os.path.exists(os.path.join(settings.STATIC_ROOT, 'test')))
++            self.assertFalse(err.getvalue())

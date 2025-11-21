@@ -97,3 +97,12 @@ class ExtraPatternsStorage(ManifestStaticFilesStorage):
 class NoneHashStorage(ManifestStaticFilesStorage):
     def file_hash(self, name, content=None):
         return None
+
+
+class ZeroPostProcessPassesStorage(ManifestStaticFilesStorage):
+    """
+    A storage class with max_post_process_passes set to 0.
+    This is used to test that post_process doesn't crash when
+    max_post_process_passes is 0.
+    """
+    max_post_process_passes = 0
