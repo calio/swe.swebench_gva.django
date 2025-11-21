@@ -1832,7 +1832,7 @@ If ``value`` is the list ``['a', 'b', 'c']``, the output will be the string
 Safely outputs a Python object as JSON, wrapped in a ``<script>`` tag, ready
 for use with JavaScript.
 
-**Argument:** HTML "id" of the ``<script>`` tag.
+**Argument:** HTML "id" of the ``<script>`` tag (optional).
 
 For example::
 
@@ -1849,6 +1849,18 @@ The resulting data can be accessed in JavaScript like this:
 .. code-block:: javascript
 
     const value = JSON.parse(document.getElementById('hello-data').textContent);
+
+If the argument is omitted, no "id" attribute will be included:
+
+.. code-block:: html
+
+    {{ value|json_script }}
+
+outputs:
+
+.. code-block:: html
+
+    <script type="application/json">{"hello": "world"}</script>
 
 XSS attacks are mitigated by escaping the characters "<", ">" and "&". For
 example if ``value`` is ``{'hello': 'world</script>&amp;'}``, the output is:

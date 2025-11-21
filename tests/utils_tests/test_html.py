@@ -173,6 +173,29 @@ class TestUtilsHtml(SimpleTestCase):
             with self.subTest(arg=arg):
                 self.assertEqual(json_script(arg, 'test_id'), expected)
 
+    def test_json_script_without_id(self):
+        # Test that json_script works without an element_id
+        tests = (
+            # "<", ">" and "&" are quoted inside JSON strings
+            (('&<>', '<script type="application/json">"\\u0026\\u003C\\u003E"</script>')),
+            # "<", ">" and "&" are quoted inside JSON objects
+            (
+                {'a': '<script>test&ing</script>'},
+                '<script type="application/json">'
+                '{"a": "\\u003Cscript\\u003Etest\\u0026ing\\u003C/script\\u003E"}</script>'
+            ),
+            # Lazy strings are quoted
+            (lazystr('&<>'), '<script type="application/json">"\\u0026\\u003C\\u003E"</script>'),
+            (
+                {'a': lazystr('<script>test&ing</script>')},
+                '<script type="application/json">'
+                '{"a": "\\u003Cscript\\u003Etest\\u0026ing\\u003C/script\\u003E"}</script>'
+            ),
+        )
+        for arg, expected in tests:
+            with self.subTest(arg=arg):
+                self.assertEqual(json_script(arg), expected)
+
     def test_smart_urlquote(self):
         items = (
             ('http://öäü.com/', 'http://xn--4ca9at.com/'),
