@@ -1,0 +1,80 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index ee45bb941e..b43316e73d 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -763,8 +763,12 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            setattr(cls, 'get_%s_display' % self.name,
+-                    partialmethod(cls._get_FIELD_display, field=self))
++            # Don't override custom get_FOO_display() methods. This allows
++            # users to override the auto-generated method.
++            display_name = 'get_%s_display' % self.name
++            if not hasattr(cls, display_name):
++                setattr(cls, display_name,
++                        partialmethod(cls._get_FIELD_display, field=self))
+ 
+     def get_filter_kwargs_for_object(self, obj):
+         """
+diff --git a/tests/model_regress/models.py b/tests/model_regress/models.py
+index a9786e37ab..6a866098f3 100644
+--- a/tests/model_regress/models.py
++++ b/tests/model_regress/models.py
+@@ -66,3 +66,15 @@ class Model2(models.Model):
+ 
+ class Model3(models.Model):
+     model2 = models.ForeignKey(Model2, models.CASCADE, unique=True, to_field='model1')
++
++
++class ChoiceFieldWithOverride(models.Model):
++    """Model to test overriding get_FOO_display() method."""
++    CHOICES = (
++        (1, 'foo'),
++        (2, 'bar'),
++    )
++    choice_field = models.IntegerField(choices=CHOICES)
++
++    def get_choice_field_display(self):
++        return 'overridden'
+diff --git a/tests/model_regress/tests.py b/tests/model_regress/tests.py
+index 28eed87008..60846d8f30 100644
+--- a/tests/model_regress/tests.py
++++ b/tests/model_regress/tests.py
+@@ -9,8 +9,8 @@ from django.test.utils import isolate_apps
+ from django.utils.timezone import get_fixed_timezone
+ 
+ from .models import (
+-    Article, Department, Event, Model1, Model2, Model3, NonAutoPK, Party,
+-    Worker,
++    Article, ChoiceFieldWithOverride, Department, Event, Model1, Model2, Model3,
++    NonAutoPK, Party, Worker,
+ )
+ 
+ 
+@@ -57,6 +57,25 @@ class ModelTests(TestCase):
+         a = Article.objects.get(pk=a.pk)
+         self.assertEqual(a.misc_data, '')
+ 
++    def test_override_get_FOO_display(self):
++        """
++        Regression test for #11999: get_FOO_display() should be overridable.
++        """
++        obj = ChoiceFieldWithOverride(choice_field=1)
++        # The overridden method should be called, not the auto-generated one
++        self.assertEqual(obj.get_choice_field_display(), 'overridden')
++
++    def test_get_FOO_display_with_choices(self):
++        """
++        Test that get_FOO_display() still works for fields with choices
++        when not overridden.
++        """
++        a = Article.objects.create(
++            headline="Test", pub_date=datetime.datetime.now(), status=1
++        )
++        # The auto-generated method should return the choice display value
++        self.assertEqual(a.get_status_display(), 'first')
++
+     def test_long_textfield(self):
+         # TextFields can hold more than 4000 characters (this was broken in
+         # Oracle).

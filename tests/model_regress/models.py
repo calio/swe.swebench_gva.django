@@ -66,3 +66,15 @@ class Model2(models.Model):
 
 class Model3(models.Model):
     model2 = models.ForeignKey(Model2, models.CASCADE, unique=True, to_field='model1')
+
+
+class ChoiceFieldWithOverride(models.Model):
+    """Model to test overriding get_FOO_display() method."""
+    CHOICES = (
+        (1, 'foo'),
+        (2, 'bar'),
+    )
+    choice_field = models.IntegerField(choices=CHOICES)
+
+    def get_choice_field_display(self):
+        return 'overridden'

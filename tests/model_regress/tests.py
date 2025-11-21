@@ -9,8 +9,8 @@ from django.test.utils import isolate_apps
 from django.utils.timezone import get_fixed_timezone
 
 from .models import (
-    Article, Department, Event, Model1, Model2, Model3, NonAutoPK, Party,
-    Worker,
+    Article, ChoiceFieldWithOverride, Department, Event, Model1, Model2, Model3,
+    NonAutoPK, Party, Worker,
 )
 
 
@@ -56,6 +56,25 @@ class ModelTests(TestCase):
         # Empty strings should be returned as string
         a = Article.objects.get(pk=a.pk)
         self.assertEqual(a.misc_data, '')
+
+    def test_override_get_FOO_display(self):
+        """
+        Regression test for #11999: get_FOO_display() should be overridable.
+        """
+        obj = ChoiceFieldWithOverride(choice_field=1)
+        # The overridden method should be called, not the auto-generated one
+        self.assertEqual(obj.get_choice_field_display(), 'overridden')
+
+    def test_get_FOO_display_with_choices(self):
+        """
+        Test that get_FOO_display() still works for fields with choices
+        when not overridden.
+        """
+        a = Article.objects.create(
+            headline="Test", pub_date=datetime.datetime.now(), status=1
+        )
+        # The auto-generated method should return the choice display value
+        self.assertEqual(a.get_status_display(), 'first')
 
     def test_long_textfield(self):
         # TextFields can hold more than 4000 characters (this was broken in
