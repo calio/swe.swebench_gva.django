@@ -35,6 +35,7 @@ from .models.custom_user import (
 )
 from .models.with_custom_email_field import CustomEmailField
 from .models.with_integer_username import IntegerUsernameUser
+from .models.with_many_to_many import CustomUserWithM2M, Organization
 from .settings import AUTH_TEMPLATES
 
 
@@ -333,6 +334,56 @@ class UserCreationFormTest(TestDataMixin, TestCase):
                 self.assertEqual(
                     form.fields[field_name].widget.attrs["autocomplete"], autocomplete
                 )
+
+    @override_settings(AUTH_USER_MODEL="auth_tests.CustomUserWithM2M")
+    def test_m2m_field_save(self):
+        """UserCreationForm should save ManyToMany fields."""
+        org1 = Organization.objects.create(name="Org 1")
+        org2 = Organization.objects.create(name="Org 2")
+
+        class CustomUserCreationForm(UserCreationForm):
+            class Meta(UserCreationForm.Meta):
+                model = CustomUserWithM2M
+                fields = ("username", "orgs")
+
+        data = {
+            "username": "testuser",
+            "password1": "testpass123",
+            "password2": "testpass123",
+            "orgs": [org1.id, org2.id],
+        }
+        form = CustomUserCreationForm(data)
+        self.assertTrue(form.is_valid())
+        user = form.save()
+        self.assertEqual(user.orgs.count(), 2)
+        self.assertIn(org1, user.orgs.all())
+        self.assertIn(org2, user.orgs.all())
+
+    @override_settings(AUTH_USER_MODEL="auth_tests.CustomUserWithM2M")
+    def test_m2m_field_save_commit_false(self):
+        """UserCreationForm should allow deferred M2M saving with commit=False."""
+        org1 = Organization.objects.create(name="Org 1")
+        org2 = Organization.objects.create(name="Org 2")
+
+        class CustomUserCreationForm(UserCreationForm):
+            class Meta(UserCreationForm.Meta):
+                model = CustomUserWithM2M
+                fields = ("username", "orgs")
+
+        data = {
+            "username": "testuser",
+            "password1": "testpass123",
+            "password2": "testpass123",
+            "orgs": [org1.id, org2.id],
+        }
+        form = CustomUserCreationForm(data)
+        self.assertTrue(form.is_valid())
+        user = form.save(commit=False)
+        user.save()
+        form.save_m2m()
+        self.assertEqual(user.orgs.count(), 2)
+        self.assertIn(org1, user.orgs.all())
+        self.assertIn(org2, user.orgs.all())
 
 
 # To verify that the login form rejects inactive users, use an authentication
