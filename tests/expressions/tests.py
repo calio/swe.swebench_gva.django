@@ -1806,6 +1806,46 @@ class ReprTests(SimpleTestCase):
         )
 
 
+class ExpressionWrapperTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.company = Company.objects.create(
+            name="Test Company", num_employees=10, num_chairs=5,
+            ceo=Employee.objects.create(firstname="John", lastname="Doe", salary=50)
+        )
+
+    def test_expression_wrapper_with_constant_value_in_group_by(self):
+        """
+        Test that constant expressions wrapped in ExpressionWrapper are not
+        included in the GROUP BY clause.
+        """
+        # This should not include the constant 3 in the GROUP BY clause
+        qs = Company.objects.annotate(
+            expr_res=ExpressionWrapper(Value(3), output_field=IntegerField())
+        ).values('expr_res').annotate(sum=Sum('num_employees'))
+        
+        # The SQL should not have the constant in GROUP BY
+        sql = str(qs.query)
+        # Check that the query executes without error
+        result = list(qs)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['expr_res'], 3)
+        self.assertEqual(result[0]['sum'], 10)
+
+    def test_value_without_wrapper_in_group_by(self):
+        """
+        Test that Value expressions without ExpressionWrapper work correctly.
+        """
+        qs = Company.objects.annotate(
+            expr_res=Value(3, output_field=IntegerField())
+        ).values('expr_res').annotate(sum=Sum('num_employees'))
+        
+        result = list(qs)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['expr_res'], 3)
+        self.assertEqual(result[0]['sum'], 10)
+
+
 class CombinableTests(SimpleTestCase):
     bitwise_msg = 'Use .bitand() and .bitor() for bitwise logical operations.'
 
